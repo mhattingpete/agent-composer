@@ -7,7 +7,7 @@
       "Step 2: Send GET request to localhost:8000/health",
       "Step 3: Verify 200 OK response with status healthy"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -17,7 +17,18 @@
       "Step 2: Open localhost:5173 in browser",
       "Step 3: Verify React app loads without errors"
     ],
-    "passes": false
+    "passes": true
+  },
+  {
+    "category": "functional",
+    "description": "React Query configured with API client and useAgents hook",
+    "steps": [
+      "Step 1: Verify QueryClientProvider wraps app in main.tsx",
+      "Step 2: Verify API client in frontend/src/services/api.ts handles agents CRUD",
+      "Step 3: Verify useAgents hook returns data from backend",
+      "Step 4: Verify loading and error states are handled in AgentStudioPage"
+    ],
+    "passes": true
   },
   {
     "category": "functional",
@@ -27,7 +38,7 @@
       "Step 2: Start backend server",
       "Step 3: Verify agent_composer.db file exists in backend directory"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -48,7 +59,7 @@
       "Step 2: Send GET request to /api/agents",
       "Step 3: Verify response is empty array []"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -59,7 +70,7 @@
       "Step 3: Verify response contains agent ID",
       "Step 4: Verify agent appears in GET /api/agents"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -69,7 +80,7 @@
       "Step 2: Send GET to /api/agents/{id}",
       "Step 3: Verify response contains all agent fields"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -80,7 +91,7 @@
       "Step 3: Verify 200 OK response",
       "Step 4: Verify GET /api/agents/{id} returns updated data"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -91,7 +102,7 @@
       "Step 3: Verify 204 No Content response",
       "Step 4: Verify GET /api/agents/{id} returns 404"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -102,7 +113,7 @@
       "Step 3: Verify connection is established",
       "Step 4: Verify SSE events are received"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -113,7 +124,7 @@
       "Step 3: Verify agent is instantiated correctly",
       "Step 4: Verify response is streamed back"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "functional",
@@ -632,7 +643,7 @@
       "Step 3: Verify header is at top",
       "Step 4: Verify main content area is present"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -643,7 +654,7 @@
       "Step 3: Verify hover states work",
       "Step 4: Verify active link is highlighted"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -654,7 +665,7 @@
       "Step 3: Verify colors change to dark theme",
       "Step 4: Verify all components use dark colors"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -831,7 +842,7 @@
       "Step 2: Verify API keys section is present",
       "Step 3: Verify Model selection section is present"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -842,7 +853,7 @@
       "Step 3: Verify input shows dots/asterisks",
       "Step 4: Verify show/hide toggle works"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "style",
@@ -1786,10 +1797,7 @@
   {
     "category": "functional",
     "description": "Monaco editor shows line numbers",
-    "steps": [
-      "Step 1: View editor",
-      "Step 2: Verify line numbers are visible"
-    ],
+    "steps": ["Step 1: View editor", "Step 2: Verify line numbers are visible"],
     "passes": false
   },
   {
@@ -2146,10 +2154,7 @@
   {
     "category": "style",
     "description": "App has favicon",
-    "steps": [
-      "Step 1: View browser tab",
-      "Step 2: Verify favicon is present"
-    ],
+    "steps": ["Step 1: View browser tab", "Step 2: Verify favicon is present"],
     "passes": false
   },
   {

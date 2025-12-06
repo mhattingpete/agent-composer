@@ -15,9 +15,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `.gitignore`
 
 **Acceptance Criteria:**
-- [ ] Python 3.11+ project with uv/pip
-- [ ] Agno installed as dependency
-- [ ] Basic FastAPI app runs on `localhost:8000`
+- [x] Python 3.11+ project with uv/pip
+- [x] Agno installed as dependency
+- [x] Basic FastAPI app runs on `localhost:8000`
 
 ---
 
@@ -31,9 +31,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/App.tsx`
 
 **Acceptance Criteria:**
-- [ ] Bun-based React 18 project
-- [ ] TypeScript configured
-- [ ] Dev server runs on `localhost:5173`
+- [x] Bun-based React 18 project
+- [x] TypeScript configured
+- [x] Dev server runs on `localhost:5173`
 
 ---
 
@@ -46,9 +46,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/config.ts`
 
 **Acceptance Criteria:**
-- [ ] `.env.example` with all required keys documented
-- [ ] Backend reads env vars with validation
-- [ ] Frontend reads public env vars
+- [x] `.env.example` with all required keys documented
+- [x] Backend reads env vars with validation
+- [x] Frontend reads public env vars
 - [ ] Clear error messages for missing keys
 
 ---
@@ -62,9 +62,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/App.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] TailwindCSS configured and working
-- [ ] Base styles applied
-- [ ] Dark mode support ready
+- [x] TailwindCSS configured and working
+- [x] Base styles applied
+- [x] Dark mode support ready
 
 ---
 
@@ -79,10 +79,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/database/migrations.py`
 
 **Acceptance Criteria:**
-- [ ] SQLite database file created on startup
-- [ ] Agent table schema defined
-- [ ] Team table schema defined
-- [ ] Conversation/session table schema defined
+- [x] SQLite database file created on startup
+- [x] Agent table schema defined
+- [x] Team table schema defined
+- [x] Conversation/session table schema defined
 
 ---
 
@@ -94,11 +94,11 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/main.py` (update to mount router)
 
 **Acceptance Criteria:**
-- [ ] `GET /api/agents` - list all agents
-- [ ] `GET /api/agents/{id}` - get single agent
-- [ ] `POST /api/agents` - create agent
-- [ ] `PUT /api/agents/{id}` - update agent
-- [ ] `DELETE /api/agents/{id}` - delete agent
+- [x] `GET /api/agents` - list all agents
+- [x] `GET /api/agents/{id}` - get single agent
+- [x] `POST /api/agents` - create agent
+- [x] `PUT /api/agents/{id}` - update agent
+- [x] `DELETE /api/agents/{id}` - delete agent
 
 ---
 
@@ -111,9 +111,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/main.py` (update)
 
 **Acceptance Criteria:**
-- [ ] AG-UI endpoint at `/api/agui`
-- [ ] SSE streaming configured
-- [ ] Event types defined (message, tool_call, state_update)
+- [x] AG-UI endpoint at `/api/agui`
+- [x] SSE streaming configured
+- [x] Event types defined (message, tool_call, state_update)
 
 ---
 
@@ -125,10 +125,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/runtime/loader.py`
 
 **Acceptance Criteria:**
-- [ ] Load agent definition from database
-- [ ] Instantiate Agno Agent with appropriate model (OpenAIChat, Claude, Ollama)
-- [ ] Execute agent with user message
-- [ ] Stream response via AG-UI
+- [x] Load agent definition from database
+- [x] Instantiate Agno Agent with appropriate model (OpenAIChat, Claude, Ollama, OpenRouter)
+- [x] Execute agent with user message
+- [x] Stream response via AG-UI
 
 *Note: Uses Agno's built-in model classes directly - no custom provider wrapper needed.*
 
@@ -145,10 +145,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/App.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Sidebar with navigation links
-- [ ] Header with app title
-- [ ] Main content area
-- [ ] Responsive layout
+- [x] Sidebar with navigation links
+- [x] Header with app title
+- [x] Main content area
+- [x] Responsive layout
 
 ---
 
@@ -162,9 +162,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/App.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Routes: `/`, `/studio`, `/settings`
-- [ ] Placeholder pages for each route
-- [ ] Navigation updates URL
+- [x] Routes: `/`, `/studio`, `/settings`
+- [x] Placeholder pages for each route
+- [x] Navigation updates URL
 
 ---
 
@@ -176,25 +176,25 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/stores/index.ts`
 
 **Acceptance Criteria:**
-- [ ] Agent store: list, selected agent
-- [ ] Settings store: API keys, preferences
-- [ ] Persistence to localStorage
+- [x] Agent store: list, selected agent
+- [x] Settings store: API keys, preferences
+- [x] Persistence to localStorage
 
 ---
 
 ### Task 2.4: Add React Query for API Calls
 **Goal:** Data fetching and caching layer
 **Files:**
-- `frontend/src/lib/api.ts`
-- `frontend/src/lib/queryClient.ts`
+- `frontend/src/services/api.ts`
+- `frontend/src/services/queryClient.ts`
 - `frontend/src/hooks/useAgents.ts`
 - `frontend/src/main.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] API client configured
-- [ ] Query client provider set up
-- [ ] `useAgents` hook for fetching agents
-- [ ] Loading and error states handled
+- [x] API client configured
+- [x] Query client provider set up
+- [x] `useAgents` hook for fetching agents
+- [x] Loading and error states handled
 
 ---
 

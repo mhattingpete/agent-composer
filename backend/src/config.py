@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # CORS settings
-    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    # CORS settings (comma-separated string in env, converted to list)
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Database settings
     database_url: str = "sqlite+aiosqlite:///./agent_composer.db"
@@ -44,13 +44,10 @@ class Settings(BaseSettings):
     default_openrouter_model: str = "anthropic/claude-3.5-sonnet"
     default_ollama_model: str = "llama3.2"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> list[str]:
-        """Parse CORS origins from comma-separated string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Get CORS origins as a list."""
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
     def has_openai_key(self) -> bool:
         """Check if OpenAI API key is configured."""

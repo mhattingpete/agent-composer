@@ -5,20 +5,25 @@ export default function SettingsPage() {
   const {
     openaiApiKey,
     anthropicApiKey,
+    openrouterApiKey,
     ollamaBaseUrl,
     defaultOpenaiModel,
     defaultAnthropicModel,
+    defaultOpenrouterModel,
     defaultOllamaModel,
     setOpenaiApiKey,
     setAnthropicApiKey,
+    setOpenrouterApiKey,
     setOllamaBaseUrl,
     setDefaultOpenaiModel,
     setDefaultAnthropicModel,
+    setDefaultOpenrouterModel,
     setDefaultOllamaModel,
   } = useSettingsStore()
 
   const [showOpenai, setShowOpenai] = useState(false)
   const [showAnthropic, setShowAnthropic] = useState(false)
+  const [showOpenrouter, setShowOpenrouter] = useState(false)
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -68,6 +73,26 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* OpenRouter */}
+          <div>
+            <label className="block text-sm font-medium mb-2">OpenRouter API Key</label>
+            <div className="flex gap-2">
+              <input
+                type={showOpenrouter ? 'text' : 'password'}
+                value={openrouterApiKey || ''}
+                onChange={(e) => setOpenrouterApiKey(e.target.value || null)}
+                placeholder="sk-or-v1-..."
+                className="input flex-1"
+              />
+              <button
+                onClick={() => setShowOpenrouter(!showOpenrouter)}
+                className="btn-secondary"
+              >
+                {showOpenrouter ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
           {/* Ollama */}
           <div>
             <label className="block text-sm font-medium mb-2">Ollama Base URL</label>
@@ -109,6 +134,17 @@ export default function SettingsPage() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-2">OpenRouter Model</label>
+            <input
+              type="text"
+              value={defaultOpenrouterModel}
+              onChange={(e) => setDefaultOpenrouterModel(e.target.value)}
+              placeholder="anthropic/claude-3.5-sonnet"
+              className="input"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-2">Ollama Model</label>
             <input
               type="text"
@@ -124,12 +160,15 @@ export default function SettingsPage() {
       {/* Connection Test */}
       <div className="card">
         <h2 className="text-lg font-semibold mb-4">Test Connection</h2>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <button className="btn-secondary" disabled>
             Test OpenAI
           </button>
           <button className="btn-secondary" disabled>
             Test Anthropic
+          </button>
+          <button className="btn-secondary" disabled>
+            Test OpenRouter
           </button>
           <button className="btn-secondary" disabled>
             Test Ollama

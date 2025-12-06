@@ -6,7 +6,7 @@ export interface Agent {
   description: string
   code: string
   model: string
-  provider: 'openai' | 'anthropic' | 'ollama'
+  provider: 'openai' | 'anthropic' | 'openrouter' | 'ollama'
   isBuiltin: boolean
   tools: string[]
   createdAt: string
