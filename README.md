@@ -99,25 +99,36 @@ agent-composer/
 │   │   ├── hooks/        # Custom React hooks
 │   │   └── lib/          # Utilities and API client
 │   └── package.json
-├── init.sh               # Development setup script
+├── Makefile              # Build and development commands
+├── init.sh               # User-friendly setup wrapper
 ├── feature_list.json     # Feature test cases
 └── README.md
 ```
 
-### Available Scripts
+### Available Commands
+
+You can use either `make` directly or the `./init.sh` wrapper:
 
 ```bash
-# Start both servers
-./init.sh
+# Using init.sh (user-friendly wrapper)
+./init.sh              # Setup and start both servers
+./init.sh setup        # Install dependencies only
+./init.sh backend      # Start backend only
+./init.sh frontend     # Start frontend only
+./init.sh test         # Run tests
+./init.sh lint         # Lint code
+./init.sh clean        # Remove generated files
 
-# Start only backend
-./init.sh backend
-
-# Start only frontend
-./init.sh frontend
-
-# Clean up (remove venvs and node_modules)
-./init.sh clean
+# Using make directly
+make help              # Show all available commands
+make install           # Install all dependencies
+make dev               # Start both servers
+make dev-backend       # Start backend only
+make dev-frontend      # Start frontend only
+make test              # Run all tests
+make lint              # Lint all code
+make build             # Build for production
+make clean             # Remove generated files
 ```
 
 ## Configuration
