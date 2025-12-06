@@ -208,10 +208,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/components/chat/MessageBubble.tsx`
 
 **Acceptance Criteria:**
-- [ ] User message bubble (right-aligned)
-- [ ] Agent message bubble (left-aligned)
-- [ ] Markdown rendering support
-- [ ] Code block syntax highlighting
+- [x] User message bubble (right-aligned)
+- [x] Agent message bubble (left-aligned)
+- [x] Markdown rendering support
+- [x] Code block syntax highlighting
 
 ---
 
@@ -222,25 +222,25 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/components/chat/FileAttachment.tsx`
 
 **Acceptance Criteria:**
-- [ ] Multi-line text input
-- [ ] Send button and Enter key support
-- [ ] File attachment button (UI only)
-- [ ] Disabled state while agent responding
+- [x] Multi-line text input
+- [x] Send button and Enter key support
+- [x] File attachment button (UI only)
+- [x] Disabled state while agent responding
 
 ---
 
-### Task 3.3: Integrate CopilotKit for AG-UI
+### Task 3.3: Integrate AG-UI Protocol
 **Goal:** Connect frontend to AG-UI backend
 **Files:**
-- `frontend/src/lib/agui.ts`
+- `frontend/src/services/agui.ts`
 - `frontend/src/hooks/useChat.ts`
 - `frontend/src/pages/ConversationPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] CopilotKit provider configured
-- [ ] `useChat` hook connects to backend
-- [ ] Messages stream in real-time
-- [ ] Conversation state persisted
+- [x] AG-UI SSE client configured
+- [x] `useChat` hook connects to backend
+- [x] Messages stream in real-time
+- [x] Conversation state persisted
 
 ---
 
@@ -251,10 +251,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/ConversationPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Dropdown to select agent
-- [ ] Shows agent name and description
-- [ ] Switching agent updates chat context
-- [ ] Current agent indicator
+- [x] Dropdown to select agent
+- [x] Shows agent name and description
+- [x] Switching agent updates chat context
+- [x] Current agent indicator
 
 ---
 
@@ -267,10 +267,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/ConversationPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] List of past conversations
-- [ ] Create new conversation button
-- [ ] Delete conversation option
-- [ ] Conversation titles (auto-generated or editable)
+- [x] List of past conversations
+- [x] Create new conversation button
+- [x] Delete conversation option
+- [x] Conversation titles (auto-generated or editable)
 
 ---
 
