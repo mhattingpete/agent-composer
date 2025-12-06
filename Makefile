@@ -39,7 +39,7 @@ help:
 
 check-prereqs:
 	@echo "Checking prerequisites..."
-	@command -v python3 >/dev/null 2>&1 || { echo "Python 3 is required but not installed."; exit 1; }
+	@command -v uv >/dev/null 2>&1 || { echo "uv is required but not installed. Install from https://docs.astral.sh/uv/"; exit 1; }
 	@command -v bun >/dev/null 2>&1 || { echo "Bun is required but not installed. Install from https://bun.sh"; exit 1; }
 	@echo "All prerequisites satisfied."
 
@@ -63,11 +63,7 @@ install: install-backend install-frontend
 
 install-backend:
 	@echo "Installing backend dependencies..."
-	cd backend && \
-	python3 -m venv venv && \
-	. venv/bin/activate && \
-	pip install --upgrade pip setuptools wheel && \
-	pip install -e ".[dev]"
+	cd backend && uv sync --dev
 	@echo "Backend dependencies installed."
 
 install-frontend:
@@ -90,8 +86,7 @@ dev:
 dev-backend:
 	@echo "Starting backend server..."
 	cd backend && \
-	. venv/bin/activate && \
-	python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend:
 	@echo "Starting frontend server..."
@@ -107,8 +102,7 @@ test: test-backend test-frontend
 test-backend:
 	@echo "Running backend tests..."
 	cd backend && \
-	. venv/bin/activate && \
-	python -m pytest tests/ -v --cov=src
+	uv run pytest tests/ -v --cov=src
 
 test-frontend:
 	@echo "Running frontend tests..."
@@ -124,9 +118,8 @@ lint: lint-backend lint-frontend
 lint-backend:
 	@echo "Linting backend..."
 	cd backend && \
-	. venv/bin/activate && \
-	ruff check src/ && \
-	ruff format --check src/
+	uv run ruff check src/ && \
+	uv run ruff format --check src/
 
 lint-frontend:
 	@echo "Linting frontend..."

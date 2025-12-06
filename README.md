@@ -28,8 +28,8 @@ A local-first platform for designing, composing, and interacting with multi-agen
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Bun (or Node.js)
+- [uv](https://docs.astral.sh/uv/) - Python package manager
+- [Bun](https://bun.sh/) - JavaScript runtime
 - At least one LLM API key (OpenAI, Anthropic) or Ollama running locally
 
 ### Setup
@@ -63,10 +63,8 @@ If you prefer manual setup:
 **Backend:**
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
-uvicorn src.main:app --reload --port 8000
+uv sync --dev
+uv run uvicorn src.main:app --reload --port 8000
 ```
 
 **Frontend:**

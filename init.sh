@@ -32,12 +32,13 @@ show_banner() {
 check_prerequisites() {
     echo -e "${YELLOW}Checking prerequisites...${NC}"
 
-    # Check Python
-    if command -v python3 &> /dev/null; then
-        PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
-        echo -e "${GREEN}✓ Python ${PYTHON_VERSION} found${NC}"
+    # Check uv
+    if command -v uv &> /dev/null; then
+        UV_VERSION=$(uv --version 2>&1 | cut -d' ' -f2)
+        echo -e "${GREEN}✓ uv ${UV_VERSION} found${NC}"
     else
-        echo -e "${RED}✗ Python 3 not found. Please install Python 3.11+${NC}"
+        echo -e "${RED}✗ uv not found. Install from https://docs.astral.sh/uv/${NC}"
+        echo -e "${YELLOW}  Run: curl -LsSf https://astral.sh/uv/install.sh | sh${NC}"
         exit 1
     fi
 
@@ -46,7 +47,7 @@ check_prerequisites() {
         BUN_VERSION=$(bun --version)
         echo -e "${GREEN}✓ Bun ${BUN_VERSION} found${NC}"
     else
-        echo -e "${YELLOW}⚠ Bun not found. Install from https://bun.sh${NC}"
+        echo -e "${RED}✗ Bun not found. Install from https://bun.sh${NC}"
         echo -e "${YELLOW}  Run: curl -fsSL https://bun.sh/install | bash${NC}"
         exit 1
     fi
@@ -142,7 +143,7 @@ case "${1:-}" in
         check_prerequisites
 
         # Check if dependencies are installed
-        if [ ! -d "backend/venv" ] || [ ! -d "frontend/node_modules" ]; then
+        if [ ! -d "backend/.venv" ] || [ ! -d "frontend/node_modules" ]; then
             echo -e "${YELLOW}Dependencies not installed. Running setup...${NC}"
             echo ""
             make setup-env
