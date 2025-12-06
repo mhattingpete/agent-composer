@@ -66,7 +66,7 @@ install-backend:
 	cd backend && \
 	python3 -m venv venv && \
 	. venv/bin/activate && \
-	pip install --upgrade pip && \
+	pip install --upgrade pip setuptools wheel && \
 	pip install -e ".[dev]"
 	@echo "Backend dependencies installed."
 
