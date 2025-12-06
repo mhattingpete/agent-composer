@@ -70,49 +70,7 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 ## Phase 1: Core Backend Infrastructure
 
-### Task 1.1: Create LLM Provider Abstraction
-**Goal:** Abstract LLM providers for easy switching
-**Files:**
-- `backend/src/providers/__init__.py`
-- `backend/src/providers/base.py`
-- `backend/src/providers/openai.py`
-- `backend/src/providers/registry.py`
-
-**Acceptance Criteria:**
-- [ ] Base provider interface defined
-- [ ] OpenAI provider implementation
-- [ ] Provider registry for lookup by name
-- [ ] Model ID configuration support
-
----
-
-### Task 1.2: Add Anthropic Provider
-**Goal:** Support Anthropic Claude models
-**Files:**
-- `backend/src/providers/anthropic.py`
-- `backend/src/providers/registry.py` (update)
-
-**Acceptance Criteria:**
-- [ ] Anthropic provider implementation
-- [ ] Registered in provider registry
-- [ ] Claude 3.5 Sonnet and Opus supported
-
----
-
-### Task 1.3: Add Ollama Provider
-**Goal:** Support local models via Ollama
-**Files:**
-- `backend/src/providers/ollama.py`
-- `backend/src/providers/registry.py` (update)
-
-**Acceptance Criteria:**
-- [ ] Ollama provider implementation
-- [ ] Connection to local Ollama instance
-- [ ] Any local model supported via model ID
-
----
-
-### Task 1.4: Set Up SQLite Database Schema
+### Task 1.1: Set Up SQLite Database Schema
 **Goal:** Create database for agent/team persistence
 **Files:**
 - `backend/src/database/__init__.py`
@@ -128,7 +86,7 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 ---
 
-### Task 1.5: Create Agent CRUD API
+### Task 1.2: Create Agent CRUD API
 **Goal:** REST endpoints for agent management
 **Files:**
 - `backend/src/api/__init__.py`
@@ -144,7 +102,7 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 ---
 
-### Task 1.6: Integrate AG-UI Adapter
+### Task 1.3: Integrate AG-UI Adapter
 **Goal:** Set up AG-UI protocol for frontend communication
 **Files:**
 - `backend/src/agui/__init__.py`
@@ -159,8 +117,8 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 ---
 
-### Task 1.7: Create Agent Runtime Service
-**Goal:** Load and execute Agno agents
+### Task 1.4: Create Agent Runtime Service
+**Goal:** Load and execute Agno agents using built-in model classes
 **Files:**
 - `backend/src/runtime/__init__.py`
 - `backend/src/runtime/executor.py`
@@ -168,9 +126,11 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 **Acceptance Criteria:**
 - [ ] Load agent definition from database
-- [ ] Instantiate Agno Agent at runtime
+- [ ] Instantiate Agno Agent with appropriate model (OpenAIChat, Claude, Ollama)
 - [ ] Execute agent with user message
 - [ ] Stream response via AG-UI
+
+*Note: Uses Agno's built-in model classes directly - no custom provider wrapper needed.*
 
 ---
 
@@ -614,50 +574,23 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 
 ---
 
-### Task 7.5: Implement Sequential Team Execution
-**Goal:** Backend for sequential agent pipeline
+### Task 7.5: Implement Team Runtime Service
+**Goal:** Load and execute Agno Teams (leverages built-in modes)
 **Files:**
 - `backend/src/runtime/team_executor.py`
-- `backend/src/runtime/sequential.py`
 - `backend/src/agui/adapter.py` (update)
 
 **Acceptance Criteria:**
-- [ ] Execute agents in defined order
-- [ ] Pass context between agents
-- [ ] Stream combined responses
+- [ ] Load team configuration from database
+- [ ] Instantiate Agno Team with configured mode (sequential/parallel/router)
+- [ ] Stream team responses via AG-UI
 - [ ] Handle agent failures gracefully
 
----
-
-### Task 7.6: Implement Parallel Team Execution
-**Goal:** Backend for parallel agent execution
-**Files:**
-- `backend/src/runtime/parallel.py`
-- `backend/src/runtime/team_executor.py` (update)
-
-**Acceptance Criteria:**
-- [ ] Execute agents simultaneously
-- [ ] Aggregate responses
-- [ ] Handle partial failures
-- [ ] Configurable timeout
+*Note: Agno's Team class natively supports sequential, parallel, and router modes - no custom implementation needed.*
 
 ---
 
-### Task 7.7: Implement Router Team Pattern
-**Goal:** Intelligent task distribution
-**Files:**
-- `backend/src/runtime/router.py`
-- `backend/src/runtime/team_executor.py` (update)
-
-**Acceptance Criteria:**
-- [ ] Analyze incoming message
-- [ ] Route to appropriate agent(s)
-- [ ] Configurable routing rules
-- [ ] Fallback agent option
-
----
-
-### Task 7.8: Add Team to Conversation UI
+### Task 7.6: Add Team to Conversation UI
 **Goal:** Select teams in chat interface
 **Files:**
 - `frontend/src/components/chat/AgentSelector.tsx` (update)
@@ -756,16 +689,18 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 | Phase | Tasks | Focus Area |
 |-------|-------|------------|
 | 0 | 4 | Project scaffolding |
-| 1 | 7 | Backend infrastructure |
+| 1 | 4 | Backend infrastructure |
 | 2 | 4 | Frontend shell |
 | 3 | 5 | Conversation UI |
 | 4 | 5 | Built-in agents |
 | 5 | 6 | Agent Studio |
 | 6 | 5 | MCP integration |
-| 7 | 8 | Team Builder |
+| 7 | 6 | Team Builder |
 | 8 | 5 | Settings & polish |
 
-**Total: 49 tasks**
+**Total: 44 tasks**
+
+*Note: LLM provider tasks removed (Agno provides OpenAIChat, Claude, Ollama). Team execution simplified (Agno's Team class handles modes natively).*
 
 Each task is designed to be:
 - Completable in a single PR
