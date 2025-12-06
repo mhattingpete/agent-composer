@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
+from src.database import init_db
+from src.api.agents import router as agents_router
+from src.agui.adapter import router as agui_router
 
 
 @asynccontextmanager
@@ -14,7 +17,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup and shutdown."""
     # Startup: Initialize database, load built-in agents
     print("Starting Agent Composer backend...")
-    # TODO: Initialize database connection
+    await init_db()
+    print("Database initialized.")
+
     # TODO: Load built-in agents
     yield
     # Shutdown: Cleanup resources
@@ -54,8 +59,9 @@ async def root() -> dict[str, str]:
     }
 
 
-# API routers will be mounted here as they are implemented
-# app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+# API routers
+app.include_router(agents_router, prefix="/api/agents", tags=["agents"])
+app.include_router(agui_router, prefix="/api/agui", tags=["ag-ui"])
 # app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 # app.include_router(mcp.router, prefix="/api/mcp", tags=["mcp"])
 # app.include_router(generate.router, prefix="/api/generate", tags=["generate"])

@@ -35,11 +35,13 @@ class Settings(BaseSettings):
     # LLM Provider API Keys (optional - can be configured via UI)
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    openrouter_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
 
     # Default models
     default_openai_model: str = "gpt-4o"
     default_anthropic_model: str = "claude-3-5-sonnet-20241022"
+    default_openrouter_model: str = "anthropic/claude-3.5-sonnet"
     default_ollama_model: str = "llama3.2"
 
     @field_validator("cors_origins", mode="before")
