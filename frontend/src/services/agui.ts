@@ -3,6 +3,7 @@ import { config } from '../config'
 export interface AGUIMessage {
   role: 'user' | 'assistant'
   content: string
+  id?: string
 }
 
 export interface AGUIEvent {
@@ -14,12 +15,17 @@ export interface AGUIEvent {
 }
 
 export interface RunAgentInput {
+  threadId: string
+  runId: string
+  state: Record<string, unknown>
   messages: Array<{
+    id: string
     role: string
     content: string
   }>
-  forwarded_props?: Record<string, unknown>
-  state?: Record<string, unknown>
+  tools: unknown[]
+  context: unknown[]
+  forwardedProps: Record<string, unknown>
 }
 
 export class AGUIClient {
@@ -33,12 +39,21 @@ export class AGUIClient {
     agentId: string,
     messages: AGUIMessage[]
   ): AsyncGenerator<AGUIEvent, void, unknown> {
+    const threadId = `thread-${Date.now()}`
+    const runId = `run-${Date.now()}`
+
     const input: RunAgentInput = {
-      messages: messages.map(m => ({
+      threadId,
+      runId,
+      state: {},
+      messages: messages.map((m, idx) => ({
+        id: m.id || `msg-${idx}-${Date.now()}`,
         role: m.role,
         content: m.content,
       })),
-      forwarded_props: {
+      tools: [],
+      context: [],
+      forwardedProps: {
         agent_id: agentId,
       },
     }

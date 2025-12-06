@@ -73,7 +73,7 @@ async def chat(
 
     Expects agent_id in forwarded_props to identify which agent to run.
     """
-    # Get agent_id from forwarded_props
+    # Get agent_id from forwarded_props (Pydantic uses snake_case internally)
     agent_id = None
     if run_input.forwarded_props and isinstance(run_input.forwarded_props, dict):
         agent_id = run_input.forwarded_props.get("agent_id")
