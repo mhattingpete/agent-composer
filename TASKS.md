@@ -33,7 +33,7 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 **Acceptance Criteria:**
 - [x] Bun-based React 18 project
 - [x] TypeScript configured
-- [x] Dev server runs on `localhost:5173`
+- [x] Dev server runs on `localhost:3000` (changed from 5173 due to port conflicts)
 
 ---
 
@@ -284,9 +284,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/agents/validator.py`
 
 **Acceptance Criteria:**
-- [ ] Pydantic schema for agent definition
-- [ ] Validation for required fields
-- [ ] Support for tools, instructions, model config
+- [x] Pydantic schema for agent definition
+- [x] Validation for required fields
+- [x] Support for tools, instructions, model config
 
 ---
 
@@ -298,10 +298,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/agents/registry.py`
 
 **Acceptance Criteria:**
-- [ ] Web search tool integration
-- [ ] Summarization instructions
-- [ ] Registered as built-in agent
-- [ ] Works in conversation UI
+- [x] Web search tool integration
+- [x] Summarization instructions
+- [x] Registered as built-in agent
+- [x] Works in conversation UI
 
 ---
 
@@ -312,9 +312,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/agents/registry.py` (update)
 
 **Acceptance Criteria:**
-- [ ] CSV/JSON parsing capability
-- [ ] Analysis instructions
-- [ ] Visualization suggestions in responses
+- [x] CSV/JSON parsing capability
+- [x] Analysis instructions
+- [x] Visualization suggestions in responses
 
 ---
 
@@ -325,9 +325,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/agents/registry.py` (update)
 
 **Acceptance Criteria:**
-- [ ] Writing style instructions
-- [ ] Multiple content types supported
-- [ ] Editing/revision capability
+- [x] Writing style instructions
+- [x] Multiple content types supported
+- [x] Editing/revision capability
 
 ---
 
@@ -338,9 +338,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/agents/registry.py` (update)
 
 **Acceptance Criteria:**
-- [ ] Code review instructions
-- [ ] Multiple language support
-- [ ] Refactoring suggestions
+- [x] Code review instructions
+- [x] Multiple language support
+- [x] Refactoring suggestions
 
 ---
 
@@ -354,10 +354,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/AgentStudioPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Monaco editor renders Python code
-- [ ] Syntax highlighting for Python
-- [ ] Editor toolbar with save button
-- [ ] Resizable editor panel
+- [x] Monaco editor renders Python code
+- [x] Syntax highlighting for Python
+- [x] Editor toolbar with save button
+- [x] Resizable editor panel
 
 ---
 
@@ -369,10 +369,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/AgentStudioPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Text area for agent description
-- [ ] "Generate Agent" button
-- [ ] Loading state during generation
-- [ ] Example prompts/suggestions
+- [x] Text area for agent description
+- [x] "Generate Agent" button
+- [x] Loading state during generation
+- [x] Example prompts/suggestions
 
 ---
 
@@ -384,10 +384,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/main.py` (update)
 
 **Acceptance Criteria:**
-- [ ] `POST /api/generate` endpoint
-- [ ] Takes description, returns agent code
-- [ ] Uses structured prompts for valid output
-- [ ] Includes appropriate tools based on description
+- [x] `POST /api/generate` endpoint
+- [x] Takes description, returns agent code
+- [x] Uses structured prompts for valid output
+- [x] Includes appropriate tools based on description
 
 ---
 
@@ -399,10 +399,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/AgentStudioPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] Accept button saves agent
-- [ ] Edit mode enables Monaco editor
-- [ ] Regenerate opens feedback dialog
-- [ ] Delete clears and resets
+- [x] Accept button saves agent
+- [x] Edit mode enables Monaco editor
+- [x] Regenerate opens feedback dialog
+- [x] Delete clears and resets
 
 ---
 
@@ -415,10 +415,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/AgentStudioPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] `POST /api/validate` checks agent code
-- [ ] Validation errors displayed inline
-- [ ] Mini chat panel for testing
-- [ ] Test before save workflow
+- [x] `POST /api/validate` checks agent code
+- [x] Validation errors displayed inline
+- [x] Mini chat panel for testing
+- [x] Test before save workflow
 
 ---
 
@@ -430,10 +430,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/pages/AgentStudioPage.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] List of saved agents
-- [ ] Built-in agents marked distinctly
-- [ ] Click to load in editor
-- [ ] Delete custom agents
+- [x] List of saved agents
+- [x] Built-in agents marked distinctly
+- [x] Click to load in editor
+- [x] Delete custom agents
 
 ---
 
@@ -447,10 +447,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/mcp/types.py`
 
 **Acceptance Criteria:**
-- [ ] Connect to MCP server by URL
-- [ ] List available tools from server
-- [ ] Execute tool calls
-- [ ] Handle connection errors
+- [x] Connect to MCP server by URL
+- [x] List available tools from server
+- [x] Execute tool calls
+- [x] Handle connection errors
 
 ---
 
@@ -462,9 +462,9 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/main.py` (update)
 
 **Acceptance Criteria:**
-- [ ] MCP server table schema
-- [ ] CRUD endpoints for MCP servers
-- [ ] Store URL, auth config, status
+- [x] MCP server table schema
+- [x] CRUD endpoints for MCP servers
+- [x] Store URL, auth config, status
 
 ---
 
@@ -477,10 +477,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/router.tsx` (update)
 
 **Acceptance Criteria:**
-- [ ] List connected MCP servers
-- [ ] Add server dialog with URL input
-- [ ] Connection status indicator
-- [ ] Remove server option
+- [x] List connected MCP servers
+- [x] Add server dialog with URL input
+- [x] Connection status indicator
+- [x] Remove server option
 
 ---
 
@@ -492,10 +492,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `backend/src/runtime/executor.py` (update)
 
 **Acceptance Criteria:**
-- [ ] UI to select tools for agent
-- [ ] Tools from connected MCP servers listed
-- [ ] Selected tools saved with agent
-- [ ] Agent runtime loads assigned tools
+- [x] UI to select tools for agent
+- [x] Tools from connected MCP servers listed
+- [x] Selected tools saved with agent
+- [x] Agent runtime loads assigned tools
 
 ---
 
@@ -507,10 +507,10 @@ Each task is self-contained, requires ≤5 file changes, and can be implemented/
 - `frontend/src/components/mcp/ServerStatus.tsx`
 
 **Acceptance Criteria:**
-- [ ] Health check endpoint
-- [ ] Periodic status polling
-- [ ] Visual status indicators
-- [ ] Reconnection on failure
+- [x] Health check endpoint
+- [x] Periodic status polling
+- [x] Visual status indicators
+- [x] Reconnection on failure
 
 ---
 

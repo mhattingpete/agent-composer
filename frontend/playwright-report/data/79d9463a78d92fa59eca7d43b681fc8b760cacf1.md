@@ -1,0 +1,42 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - paragraph [ref=e9]: Hi, I'm an agent. Want to chat?
+          - generic [ref=e10]:
+            - button "Regenerate response" [ref=e11] [cursor=pointer]:
+              - img
+            - button "Copy to clipboard" [ref=e12] [cursor=pointer]:
+              - img
+            - button "Thumbs up" [ref=e13] [cursor=pointer]:
+              - img
+            - button "Thumbs down" [ref=e14] [cursor=pointer]:
+              - img
+        - generic [ref=e15]: hi
+      - contentinfo [ref=e16]:
+        - generic [ref=e17]:
+          - button "Change background" [ref=e18] [cursor=pointer]
+          - button "Generate sonnet" [ref=e19] [cursor=pointer]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - textbox "Type a message..." [active] [ref=e22]
+        - button [disabled] [ref=e25]:
+          - img [ref=e26]
+      - paragraph [ref=e29]: Powered by CopilotKit
+  - generic [ref=e34] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e35]:
+      - img [ref=e36]
+    - generic [ref=e39]:
+      - button "Open issues overlay" [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: "0"
+          - generic [ref=e43]: "1"
+        - generic [ref=e44]: Issue
+      - button "Collapse issues badge" [ref=e45]:
+        - img [ref=e46]
+  - alert [ref=e48]
+```

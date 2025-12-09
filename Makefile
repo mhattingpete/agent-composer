@@ -1,164 +1,63 @@
-.PHONY: help install install-backend install-frontend dev dev-backend dev-frontend clean clean-backend clean-frontend test test-backend test-frontend lint lint-backend lint-frontend build check-prereqs setup-env
+.PHONY: install install-backend install-frontend dev dev-backend dev-frontend build lint test clean \
+       model model-deepseek model-qwen
 
-# Default target
-help:
-	@echo "Agent Composer - Development Commands"
-	@echo ""
-	@echo "Setup:"
-	@echo "  make install          Install all dependencies"
-	@echo "  make install-backend  Install backend dependencies only"
-	@echo "  make install-frontend Install frontend dependencies only"
-	@echo "  make setup-env        Create .env files from templates"
-	@echo ""
-	@echo "Development:"
-	@echo "  make dev              Start both backend and frontend"
-	@echo "  make dev-backend      Start backend server only"
-	@echo "  make dev-frontend     Start frontend server only"
-	@echo ""
-	@echo "Testing:"
-	@echo "  make test             Run all tests"
-	@echo "  make test-backend     Run backend tests only"
-	@echo "  make test-frontend    Run frontend tests only"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  make lint             Lint all code"
-	@echo "  make lint-backend     Lint backend code"
-	@echo "  make lint-frontend    Lint frontend code"
-	@echo ""
-	@echo "Build:"
-	@echo "  make build            Build for production"
-	@echo ""
-	@echo "Cleanup:"
-	@echo "  make clean            Remove all generated files"
-	@echo "  make clean-backend    Remove backend generated files"
-	@echo "  make clean-frontend   Remove frontend generated files"
-
-# =============================================================================
-# Prerequisites
-# =============================================================================
-
-check-prereqs:
-	@echo "Checking prerequisites..."
-	@command -v uv >/dev/null 2>&1 || { echo "uv is required but not installed. Install from https://docs.astral.sh/uv/"; exit 1; }
-	@command -v bun >/dev/null 2>&1 || { echo "Bun is required but not installed. Install from https://bun.sh"; exit 1; }
-	@echo "All prerequisites satisfied."
-
-# =============================================================================
-# Environment Setup
-# =============================================================================
-
-setup-env:
-	@echo "Setting up environment files..."
-	@test -f .env || (test -f .env.example && cp .env.example .env && echo "Created .env from template")
-	@test -f backend/.env || (test -f backend/.env.example && cp backend/.env.example backend/.env && echo "Created backend/.env from template")
-	@test -f frontend/.env || (test -f frontend/.env.example && cp frontend/.env.example frontend/.env && echo "Created frontend/.env from template")
-	@echo "Environment files ready. Edit .env to add your API keys."
-
-# =============================================================================
-# Installation
-# =============================================================================
-
+# Install all dependencies
 install: install-backend install-frontend
-	@echo "All dependencies installed."
 
 install-backend:
-	@echo "Installing backend dependencies..."
-	cd backend && uv sync --dev
-	@echo "Backend dependencies installed."
+	cd backend && uv sync
 
 install-frontend:
-	@echo "Installing frontend dependencies..."
 	cd frontend && bun install
-	@echo "Frontend dependencies installed."
 
-# =============================================================================
-# Development Servers
-# =============================================================================
-
+# Development servers
 dev:
-	@echo "Starting development servers..."
-	@echo "Backend: http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
-	@echo "API Docs: http://localhost:8000/docs"
-	@echo ""
-	@$(MAKE) -j2 dev-backend dev-frontend
+	$(MAKE) -j2 dev-backend dev-frontend
 
 dev-backend:
-	@echo "Starting backend server..."
-	cd backend && \
-	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+	cd backend && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend:
-	@echo "Starting frontend server..."
 	cd frontend && bun run dev
 
-# =============================================================================
-# Testing
-# =============================================================================
-
-test: test-backend test-frontend
-	@echo "All tests complete."
-
-test-backend:
-	@echo "Running backend tests..."
-	cd backend && \
-	uv run pytest tests/ -v --cov=src
-
-test-frontend:
-	@echo "Running frontend tests..."
-	cd frontend && bun test
-
-# =============================================================================
-# Linting
-# =============================================================================
-
-lint: lint-backend lint-frontend
-	@echo "Linting complete."
-
-lint-backend:
-	@echo "Linting backend..."
-	cd backend && \
-	uv run ruff check src/ && \
-	uv run ruff format --check src/
-
-lint-frontend:
-	@echo "Linting frontend..."
-	cd frontend && bun run lint
-
-# =============================================================================
 # Build
-# =============================================================================
-
-build: build-frontend
-	@echo "Build complete."
-
-build-frontend:
-	@echo "Building frontend..."
+build:
 	cd frontend && bun run build
 
+# Linting
+lint:
+	cd backend && uv run ruff check src
+	cd frontend && bun run lint
+
+lint-fix:
+	cd backend && uv run ruff check --fix src
+
+# Testing
+test:
+	cd backend && uv run pytest
+
+# Clean
+clean:
+	rm -rf frontend/.next frontend/node_modules
+	rm -rf backend/.venv backend/__pycache__ backend/src/__pycache__
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+
 # =============================================================================
-# Cleanup
+# LLM Model Management
 # =============================================================================
 
-clean: clean-backend clean-frontend
-	@echo "Cleanup complete."
-	rm -rf .tmp
+model-deepseek:
+	@echo "Starting DeepSeek R1 Distill 7B... Logs: backend/logs/llama-server.log"
+	llama-server --jinja -hf unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q4_K_M 2>&1 | tee logs/llama-server.log
+	#cd backend && uv run python scripts/run_model.py unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf 2>&1 | tee logs/llama-server.log
 
-clean-backend:
-	@echo "Cleaning backend..."
-	rm -rf backend/venv
-	rm -rf backend/.venv
-	rm -rf backend/__pycache__
-	rm -rf backend/src/__pycache__
-	rm -rf backend/.pytest_cache
-	rm -rf backend/.ruff_cache
-	rm -rf backend/*.egg-info
-	rm -rf backend/dist
-	rm -rf backend/build
-	rm -f backend/*.db
+model-gpt-oss:
+	@echo "Starting GPT-OSS 20B... Logs: backend/logs/llama-server.log"
+	llama-server --jinja -hf unsloth/gpt-oss-20b-GGUF:Q4_K_M 2>&1 | tee logs/llama-server.log
 
-clean-frontend:
-	@echo "Cleaning frontend..."
-	rm -rf frontend/node_modules
-	rm -rf frontend/dist
-	rm -rf frontend/.cache
+# Generic model runner - usage: make model MODEL=<hf-model-path>
+MODEL ?= unsloth/DeepSeek-R1-Distill-Qwen-14B-GGUF:Q4_K_M
+model:
+	@echo "Starting $(MODEL)... Logs: backend/logs/llama-server.log"
+	llama-server --jinja -hf $(MODEL) 2>&1 | tee logs/llama-server.log

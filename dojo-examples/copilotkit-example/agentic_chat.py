@@ -1,15 +1,14 @@
-"""Agno Agent with LlamaCpp backend.
+"""Example: Agno Agent with Finance tools
 
-This example shows how to create an Agno Agent with a local llama.cpp server.
+This example shows how to create an Agno Agent with tools (YFinanceTools) and expose it in an AG-UI compatible way.
 """
 
-import os
-
 from agno.agent.agent import Agent
-from agno.models.openai.like import OpenAILike
+from agno.models.openai import OpenAIChat
 from agno.os import AgentOS
 from agno.os.interfaces.agui import AGUI
 from agno.tools import tool
+from agno.tools.yfinance import YFinanceTools
 
 
 @tool(external_execution=True)
@@ -23,15 +22,13 @@ def change_background(background: str) -> str:  # pylint: disable=unused-argumen
 
 
 agent = Agent(
-    model=OpenAILike(
-        id="local-model",
-        base_url=os.getenv("LLAMACPP_BASE_URL", "http://127.0.0.1:8080/v1"),
-    ),
+    model=OpenAIChat(id="gpt-4o"),
     tools=[
+        YFinanceTools(),
         change_background,
     ],
-    description="You are a helpful AI assistant.",
-    instructions="Format your response using markdown where appropriate.",
+    description="You are an investment analyst that researches stock prices, analyst recommendations, and stock fundamentals.",
+    instructions="Format your response using markdown and use tables to display data where possible.",
 )
 
 agent_os = AgentOS(agents=[agent], interfaces=[AGUI(agent=agent)])
