@@ -1,0 +1,13 @@
+{
+  "name": "agent-composer-server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch index.ts",
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@ag-ui/client": "^0.0.42",
+    "@copilotkit/runtime": "^1.10.6"
+  }
+}

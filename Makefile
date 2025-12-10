@@ -1,8 +1,8 @@
-.PHONY: install install-backend install-frontend dev dev-backend dev-frontend build lint test clean \
+.PHONY: install install-backend install-frontend install-server dev dev-backend dev-frontend dev-server build lint test clean \
        model model-deepseek model-qwen
 
 # Install all dependencies
-install: install-backend install-frontend
+install: install-backend install-frontend install-server
 
 install-backend:
 	cd backend && uv sync
@@ -10,15 +10,21 @@ install-backend:
 install-frontend:
 	cd frontend && bun install
 
-# Development servers
+install-server:
+	cd server && bun install
+
+# Development servers (run all 3 concurrently)
 dev:
-	$(MAKE) -j2 dev-backend dev-frontend
+	$(MAKE) -j3 dev-backend dev-frontend dev-server
 
 dev-backend:
 	cd backend && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend:
 	cd frontend && bun run dev
+
+dev-server:
+	cd server && bun run dev
 
 # Build
 build:
@@ -38,7 +44,8 @@ test:
 
 # Clean
 clean:
-	rm -rf frontend/.next frontend/node_modules
+	rm -rf frontend/dist frontend/node_modules
+	rm -rf server/node_modules
 	rm -rf backend/.venv backend/__pycache__ backend/src/__pycache__
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true

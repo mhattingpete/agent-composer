@@ -1,36 +1,11 @@
-"use client";
-import React, { useState } from "react";
-import "@copilotkit/react-ui/styles.css";
-import "./style.css";
-import {
-  CopilotKit,
-  useFrontendTool,
-} from "@copilotkit/react-core";
+import { useState } from "react";
+import { useFrontendTool } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 
-interface AgenticChatProps {
-  params: Promise<{
-    integrationId: string;
-  }>;
-}
-
-const AgenticChat: React.FC<AgenticChatProps> = ({ params }) => {
-  const { integrationId } = React.use(params);
-
-  return (
-    <CopilotKit
-      runtimeUrl="/api/copilotkit"
-      showDevConsole={false}
-      // agent lock to the relevant agent
-      agent="agentic_chat"
-    >
-      <Chat />
-    </CopilotKit>
+export default function Chat() {
+  const [background, setBackground] = useState<string>(
+    "--copilot-kit-background-color"
   );
-};
-
-const Chat = () => {
-  const [background, setBackground] = useState<string>("--copilot-kit-background-color");
 
   useFrontendTool({
     name: "change_background",
@@ -76,6 +51,4 @@ const Chat = () => {
       </div>
     </div>
   );
-};
-
-export default AgenticChat;
+}
