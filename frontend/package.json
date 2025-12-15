@@ -10,14 +10,11 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@copilotkit/react-core": "^1.8.0",
-    "@copilotkit/react-ui": "^1.8.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0"
+    "react-markdown": "^9.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",

@@ -1,8 +1,8 @@
-.PHONY: install install-backend install-frontend install-server dev dev-backend dev-frontend dev-server build lint test clean \
+.PHONY: install install-backend install-frontend dev dev-backend dev-frontend build lint test test-backend test-e2e clean \
        model model-deepseek model-qwen
 
 # Install all dependencies
-install: install-backend install-frontend install-server
+install: install-backend install-frontend
 
 install-backend:
 	cd backend && uv sync
@@ -10,21 +10,15 @@ install-backend:
 install-frontend:
 	cd frontend && bun install
 
-install-server:
-	cd server && bun install
-
-# Development servers (run all 3 concurrently)
+# Development servers (run both concurrently)
 dev:
-	$(MAKE) -j3 dev-backend dev-frontend dev-server
+	$(MAKE) -j2 dev-backend dev-frontend
 
 dev-backend:
 	cd backend && uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 dev-frontend:
 	cd frontend && bun run dev
-
-dev-server:
-	cd server && bun run dev
 
 # Build
 build:
@@ -39,13 +33,23 @@ lint-fix:
 	cd backend && uv run ruff check --fix src
 
 # Testing
-test:
-	cd backend && uv run pytest
+test: test-backend
+
+test-backend:
+	cd backend && uv run pytest tests/test_agui.py -v
+
+test-e2e:
+	@echo "Running E2E tests (requires both backend on :8000 and frontend on :3001)..."
+	cd backend && uv run pytest tests/test_e2e.py -v --browser chromium
+
+test-e2e-headed:
+	cd backend && uv run pytest tests/test_e2e.py -v --browser chromium --headed
+
+test-all: test-backend test-e2e
 
 # Clean
 clean:
 	rm -rf frontend/dist frontend/node_modules
-	rm -rf server/node_modules
 	rm -rf backend/.venv backend/__pycache__ backend/src/__pycache__
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
