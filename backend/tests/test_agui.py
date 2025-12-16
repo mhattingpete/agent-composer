@@ -108,8 +108,8 @@ async def test_agui_endpoint_validates_request():
 
 
 @pytest.mark.asyncio
-async def test_agui_endpoint_action_execution_flow():
-    """Test that tool calls produce ActionExecution events."""
+async def test_agui_endpoint_tool_call_flow():
+    """Test that tool calls produce TOOL_CALL events."""
     request = {
         "thread_id": "test-thread",
         "run_id": str(uuid.uuid4()),
@@ -134,10 +134,10 @@ async def test_agui_endpoint_action_execution_flow():
         events = parse_sse_events(response.text)
         event_types = [e.get("type") for e in events]
 
-        # When the agent uses a tool, we should see ActionExecution events
+        # When the agent uses a tool, we should see TOOL_CALL events
         # Note: This depends on the model actually calling a tool
-        if "ACTION_EXECUTION_START" in event_types:
-            action_starts = [e for e in events if e.get("type") == "ACTION_EXECUTION_START"]
-            for start in action_starts:
-                assert "actionExecutionId" in start
-                assert "actionName" in start
+        if "TOOL_CALL_START" in event_types:
+            tool_starts = [e for e in events if e.get("type") == "TOOL_CALL_START"]
+            for start in tool_starts:
+                assert "toolCallId" in start
+                assert "toolCallName" in start
