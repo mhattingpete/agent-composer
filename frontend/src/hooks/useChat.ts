@@ -1,16 +1,19 @@
 import { useState, useCallback, useRef } from "react";
 import type { Message, ToolCall, AGUIEvent } from "../types/agui";
 
-const BACKEND_URL = "/api/agui";
+// Base URL for agent endpoints
+// Backend mounts AGUI routers at /{agent_id}/agui
+// Frontend proxy strips /api, so /api/{agent_id}/agui -> /{agent_id}/agui
+const BACKEND_BASE_URL = "/api";
 
-export function useChat() {
+export function useChat(agentId: string = "general") {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
+  const sendMessage = useCallback(async (content: string): Promise<Message | undefined> => {
+    if (!content.trim()) return undefined;
 
     // Add user message
     const userMessage: Message = {
@@ -28,12 +31,16 @@ export function useChat() {
     abortControllerRef.current = new AbortController();
 
     // Track current assistant message and tool calls
+    // Tool calls may arrive before TEXT_MESSAGE_START, so we need to handle that
     let currentMessageId: string | null = null;
     let currentMessageContent = "";
     const toolCalls = new Map<string, ToolCall>();
+    let pendingToolCallMessageId: string | null = null; // For tool calls that arrive before text message
 
     try {
-      const response = await fetch(BACKEND_URL, {
+      // Use agent-specific endpoint: /api/{agentId}/agui -> /{agentId}/agui after proxy
+      const url = `${BACKEND_BASE_URL}/${agentId}/agui`;
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,28 +108,48 @@ export function useChat() {
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        return; // Request was cancelled
+        return userMessage; // Request was cancelled but still return user message
       }
       setError((err as Error).message);
     } finally {
       setIsLoading(false);
     }
 
+    return userMessage;
+
     function processEvent(event: AGUIEvent) {
       switch (event.type) {
         case "TEXT_MESSAGE_START":
           // All streamed text messages are from assistant
-          currentMessageId = event.messageId;
           currentMessageContent = "";
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: event.messageId,
-              role: "assistant",
-              content: "",
-              toolCalls: [],
-            },
-          ]);
+
+          // If we already created a message for tool calls, update it instead of creating a new one
+          if (pendingToolCallMessageId) {
+            // Update the existing message's ID to match the new one if different
+            if (pendingToolCallMessageId !== event.messageId) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === pendingToolCallMessageId
+                    ? { ...m, id: event.messageId }
+                    : m
+                )
+              );
+            }
+            currentMessageId = event.messageId;
+            pendingToolCallMessageId = null;
+          } else {
+            // No pending tool calls, create a fresh assistant message
+            currentMessageId = event.messageId;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: event.messageId,
+                role: "assistant",
+                content: "",
+                toolCalls: [],
+              },
+            ]);
+          }
           break;
 
         case "TEXT_MESSAGE_CONTENT":
@@ -142,36 +169,52 @@ export function useChat() {
           // Message is complete
           break;
 
-        case "ACTION_EXECUTION_START":
-          toolCalls.set(event.actionExecutionId, {
-            id: event.actionExecutionId,
-            name: event.actionName,
+        case "TOOL_CALL_START":
+          // If no assistant message exists yet, create one for the tool calls
+          if (!currentMessageId) {
+            // Use parentMessageId if available, otherwise generate one
+            const msgId = event.parentMessageId || crypto.randomUUID();
+            pendingToolCallMessageId = msgId;
+            currentMessageId = msgId;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: msgId,
+                role: "assistant",
+                content: "",
+                toolCalls: [],
+              },
+            ]);
+          }
+          toolCalls.set(event.toolCallId, {
+            id: event.toolCallId,
+            name: event.toolCallName,
             args: "",
             status: "running",
           });
           updateToolCalls();
           break;
 
-        case "ACTION_EXECUTION_ARGS":
-          const toolCall = toolCalls.get(event.actionExecutionId);
+        case "TOOL_CALL_ARGS":
+          const toolCall = toolCalls.get(event.toolCallId);
           if (toolCall) {
-            toolCall.args += event.args;
+            toolCall.args += event.delta;
             updateToolCalls();
           }
           break;
 
-        case "ACTION_EXECUTION_END":
-          const endedTool = toolCalls.get(event.actionExecutionId);
+        case "TOOL_CALL_END":
+          const endedTool = toolCalls.get(event.toolCallId);
           if (endedTool) {
             endedTool.status = "pending";
             updateToolCalls();
           }
           break;
 
-        case "ACTION_EXECUTION_RESULT":
-          const resultTool = toolCalls.get(event.actionExecutionId);
+        case "TOOL_CALL_RESULT":
+          const resultTool = toolCalls.get(event.toolCallId);
           if (resultTool) {
-            resultTool.result = event.result;
+            resultTool.result = event.content;
             resultTool.status = "complete";
             updateToolCalls();
           }
@@ -193,7 +236,7 @@ export function useChat() {
         )
       );
     }
-  }, [messages]);
+  }, [messages, agentId]);
 
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -207,6 +250,7 @@ export function useChat() {
 
   return {
     messages,
+    setMessages,
     isLoading,
     error,
     sendMessage,

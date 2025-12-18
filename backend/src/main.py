@@ -1,7 +1,8 @@
-"""Agno Agent with Python interpreter tool.
+"""Agno Agent with Python interpreter tool and multi-agent support.
 
-This agent can run Python code and install packages via uv to accomplish tasks.
-Tools registered in the ToolRegistry are available as functions within the interpreter.
+This module provides multiple agents (general, coding, research) that can run
+Python code and install packages via uv. Tools registered in the ToolRegistry
+are available as functions within the interpreter.
 """
 
 import logging
@@ -10,18 +11,18 @@ import sys
 from io import StringIO
 from pathlib import Path
 
-from agno.agent.agent import Agent
-from agno.models.openrouter import OpenRouter
-from agno.os import AgentOS
-from agno.os.interfaces.agui import AGUI
 from agno.tools import tool
 from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Ensure src directory is in path for uvicorn imports
 _src_dir = str(Path(__file__).parent)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
+from agents import create_agent, get_agent_list
+from conversations import store as conversation_store
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
 load_dotenv()
@@ -194,48 +195,168 @@ def save_and_run_python_file(file_name: str, code: str) -> str:
     return output if output else f"{file_name} ran successfully (no output)"
 
 
-# Generate dynamic tool documentation
+# Generate dynamic tool documentation for agent instructions
 tool_docs = registry.generate_instructions()
 
-agent = Agent(
-    model=OpenRouter(id="mistralai/devstral-2512:free"),
-    tools=[uv_add, run_python_code, save_and_run_python_file],
-    description="You are a helpful AI assistant that accomplishes tasks using Python scripts.",
-    instructions=f"""You have ONLY 3 tools available:
-1. run_python_code - Execute Python code (ALWAYS use this for tasks)
-2. uv_add - Install Python packages
-3. save_and_run_python_file - Save and run a Python file
+# Shared tools for all agents
+AGENT_TOOLS = [uv_add, run_python_code, save_and_run_python_file]
 
-IMPORTANT: You do NOT have web_search, fetch_url, or any other tools as direct function calls.
-To search the web or use other capabilities, you MUST write Python code and use run_python_code.
 
-Inside run_python_code, these functions are available (no imports needed):
-{tool_docs}
+def get_agent(agent_id: str):
+    """Get or create an agent by ID."""
+    return create_agent(
+        agent_id=agent_id,
+        tools=AGENT_TOOLS,
+        tool_docs=tool_docs,
+        debug_mode=True,
+    )
 
-### Example - To search the web:
-Use run_python_code with this code:
-```python
-results = web_search("Python tutorials", num_results=3)
-print(results)
-```
 
-### Example - To fetch a URL:
-Use run_python_code with this code:
-```python
-content = fetch_url("https://example.com")
-print(content[:500])
-```
+# Create FastAPI app
+app = FastAPI(title="Agent Composer", description="Multi-agent AI assistant")
 
-NEVER call web_search or fetch_url directly. ALWAYS wrap them in run_python_code.
-
-Format your response using markdown where appropriate.""",
-    debug_mode=True,  # Enable Agno debug logging
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-agent_os = AgentOS(agents=[agent], interfaces=[AGUI(agent=agent)])
 
-app = agent_os.get_app()
+@app.get("/agents")
+async def list_agents():
+    """List available agents for the frontend dropdown.
+
+    Frontend calls /api/agents, Vite proxy strips /api, so backend sees /agents.
+    """
+    return get_agent_list()
+
+
+# ============================================================================
+# Conversation API endpoints
+# ============================================================================
+
+from pydantic import BaseModel
+
+
+class CreateConversationRequest(BaseModel):
+    """Request body for creating a conversation."""
+
+    agent_id: str = "general"
+    title: str | None = None
+
+
+class AddMessageRequest(BaseModel):
+    """Request body for adding a message to a conversation."""
+
+    role: str
+    content: str
+    tool_calls: list[dict] = []
+    message_id: str | None = None
+
+
+class UpdateTitleRequest(BaseModel):
+    """Request body for updating conversation title."""
+
+    title: str
+
+
+@app.get("/conversations")
+async def list_conversations():
+    """List all conversations (summaries only, no messages)."""
+    conversations = conversation_store.list_all()
+    return [conv.to_summary() for conv in conversations]
+
+
+@app.post("/conversations")
+async def create_conversation(request: CreateConversationRequest):
+    """Create a new conversation."""
+    conversation = conversation_store.create(
+        agent_id=request.agent_id,
+        title=request.title,
+    )
+    return conversation.to_dict()
+
+
+@app.get("/conversations/{conv_id}")
+async def get_conversation(conv_id: str):
+    """Get a conversation with all its messages."""
+    conversation = conversation_store.get(conv_id)
+    if not conversation:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation.to_dict()
+
+
+@app.delete("/conversations/{conv_id}")
+async def delete_conversation(conv_id: str):
+    """Delete a conversation."""
+    deleted = conversation_store.delete(conv_id)
+    if not deleted:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"status": "deleted"}
+
+
+@app.post("/conversations/{conv_id}/messages")
+async def add_message(conv_id: str, request: AddMessageRequest):
+    """Add a message to a conversation."""
+    message = conversation_store.add_message(
+        conv_id=conv_id,
+        role=request.role,
+        content=request.content,
+        tool_calls=request.tool_calls,
+        message_id=request.message_id,
+    )
+    if not message:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {
+        "id": message.id,
+        "role": message.role,
+        "content": message.content,
+        "tool_calls": message.tool_calls,
+        "timestamp": message.timestamp,
+    }
+
+
+@app.patch("/conversations/{conv_id}/title")
+async def update_conversation_title(conv_id: str, request: UpdateTitleRequest):
+    """Update a conversation's title."""
+    updated = conversation_store.update_title(conv_id, request.title)
+    if not updated:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"status": "updated", "title": request.title}
+
+
+# ============================================================================
+# Import AGUI for streaming
+from agno.os.interfaces.agui import AGUI
+
+# Create AGUI routers for each agent and mount them at different paths
+# This allows agent selection via URL path: /agui/general, /agui/coding, /agui/research
+for agent_id in ["general", "coding", "research"]:
+    agent = get_agent(agent_id)
+    agui = AGUI(agent=agent)
+    router = agui.get_router()
+    # Mount at /agui/{agent_id} - the router itself has /agui endpoint
+    # So we strip that and mount the inner routes
+    app.include_router(router, prefix=f"/{agent_id}", tags=[agent_id])
+
+# Also mount a default endpoint for backwards compatibility
+default_agent = get_agent("general")
+default_agui = AGUI(agent=default_agent)
+app.include_router(default_agui.get_router(), tags=["default"])
 
 
 if __name__ == "__main__":
+    # Test with general agent
+    agent = get_agent("general")
     agent.print_response("Search the web for 'Python best practices 2024' and summarize the top 3 results.")

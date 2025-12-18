@@ -1,4 +1,5 @@
 // AG-UI Protocol Event Types (SSE format from Agno AGUI interface)
+// Uses snake_case in JSON (camelCase aliases) per AG-UI protocol spec
 
 export type EventType =
   | "RUN_STARTED"
@@ -7,10 +8,10 @@ export type EventType =
   | "TEXT_MESSAGE_START"
   | "TEXT_MESSAGE_CONTENT"
   | "TEXT_MESSAGE_END"
-  | "ACTION_EXECUTION_START"
-  | "ACTION_EXECUTION_ARGS"
-  | "ACTION_EXECUTION_END"
-  | "ACTION_EXECUTION_RESULT";
+  | "TOOL_CALL_START"
+  | "TOOL_CALL_ARGS"
+  | "TOOL_CALL_END"
+  | "TOOL_CALL_RESULT";
 
 export interface BaseEvent {
   type: EventType;
@@ -51,29 +52,31 @@ export interface TextMessageEndEvent extends BaseEvent {
   messageId: string;
 }
 
-export interface ActionExecutionStartEvent extends BaseEvent {
-  type: "ACTION_EXECUTION_START";
-  actionExecutionId: string;
-  actionName: string;
+// Tool call events use camelCase in JSON per AG-UI protocol
+export interface ToolCallStartEvent extends BaseEvent {
+  type: "TOOL_CALL_START";
+  toolCallId: string;
+  toolCallName: string;
   parentMessageId?: string;
 }
 
-export interface ActionExecutionArgsEvent extends BaseEvent {
-  type: "ACTION_EXECUTION_ARGS";
-  actionExecutionId: string;
-  args: string;
+export interface ToolCallArgsEvent extends BaseEvent {
+  type: "TOOL_CALL_ARGS";
+  toolCallId: string;
+  delta: string; // Arguments are streamed as delta
 }
 
-export interface ActionExecutionEndEvent extends BaseEvent {
-  type: "ACTION_EXECUTION_END";
-  actionExecutionId: string;
+export interface ToolCallEndEvent extends BaseEvent {
+  type: "TOOL_CALL_END";
+  toolCallId: string;
 }
 
-export interface ActionExecutionResultEvent extends BaseEvent {
-  type: "ACTION_EXECUTION_RESULT";
-  actionExecutionId: string;
-  actionName: string;
-  result: string;
+export interface ToolCallResultEvent extends BaseEvent {
+  type: "TOOL_CALL_RESULT";
+  messageId: string;
+  toolCallId: string;
+  content: string; // Result content
+  role?: "tool";
 }
 
 export type AGUIEvent =
@@ -83,10 +86,10 @@ export type AGUIEvent =
   | TextMessageStartEvent
   | TextMessageContentEvent
   | TextMessageEndEvent
-  | ActionExecutionStartEvent
-  | ActionExecutionArgsEvent
-  | ActionExecutionEndEvent
-  | ActionExecutionResultEvent;
+  | ToolCallStartEvent
+  | ToolCallArgsEvent
+  | ToolCallEndEvent
+  | ToolCallResultEvent;
 
 // Message types for the UI
 export interface Message {
@@ -102,4 +105,23 @@ export interface ToolCall {
   args: string;
   result?: string;
   status: "pending" | "running" | "complete" | "error";
+}
+
+// Conversation types for sidebar
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  agent_id: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  agent_id: string;
+  messages: Message[];
+  created_at: string;
+  updated_at: string;
 }

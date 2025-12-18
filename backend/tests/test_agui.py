@@ -1,4 +1,4 @@
-"""Tests for the AG-UI endpoint."""
+"""Tests for the AG-UI endpoint and multi-agent support."""
 
 import json
 import uuid
@@ -45,11 +45,36 @@ def agui_request():
 
 
 @pytest.mark.asyncio
+async def test_agents_list_endpoint():
+    """Test that the /agents endpoint returns the list of available agents."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=10.0) as client:
+        response = await client.get("/agents")
+        assert response.status_code == 200
+
+        agents = response.json()
+        assert len(agents) == 3  # general, coding, research
+
+        # Check structure
+        for agent in agents:
+            assert "id" in agent
+            assert "name" in agent
+            assert "description" in agent
+
+        # Check specific agents exist
+        agent_ids = [a["id"] for a in agents]
+        assert "general" in agent_ids
+        assert "coding" in agent_ids
+        assert "research" in agent_ids
+
+
+@pytest.mark.asyncio
 async def test_agui_endpoint_returns_streaming_response(agui_request):
-    """Test that the /agui endpoint returns a streaming response with AG-UI events."""
+    """Test that the agent-specific /agui endpoint returns a streaming response."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=60.0) as client:
-        response = await client.post("/agui", json=agui_request)
+        # Test with general agent
+        response = await client.post("/general/agui", json=agui_request)
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")
 
@@ -70,7 +95,7 @@ async def test_agui_endpoint_text_message_flow(agui_request):
     """Test the complete text message flow: start -> content -> end."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=60.0) as client:
-        response = await client.post("/agui", json=agui_request)
+        response = await client.post("/general/agui", json=agui_request)
         assert response.status_code == 200
 
         events = parse_sse_events(response.text)
@@ -103,7 +128,7 @@ async def test_agui_endpoint_validates_request():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=10.0) as client:
         # Missing required fields
-        response = await client.post("/agui", json={"thread_id": "test"})
+        response = await client.post("/general/agui", json={"thread_id": "test"})
         assert response.status_code == 422  # Unprocessable Entity
 
 
@@ -128,7 +153,8 @@ async def test_agui_endpoint_tool_call_flow():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=90.0) as client:
-        response = await client.post("/agui", json=request)
+        # Test with coding agent (more likely to use code tools)
+        response = await client.post("/coding/agui", json=request)
         assert response.status_code == 200
 
         events = parse_sse_events(response.text)
@@ -141,3 +167,14 @@ async def test_agui_endpoint_tool_call_flow():
             for start in tool_starts:
                 assert "toolCallId" in start
                 assert "toolCallName" in start
+
+
+@pytest.mark.asyncio
+async def test_different_agents_accessible():
+    """Test that all three agents are accessible via their endpoints."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=10.0) as client:
+        # Check status endpoints for each agent
+        for agent_id in ["general", "coding", "research"]:
+            response = await client.get(f"/{agent_id}/status")
+            assert response.status_code == 200, f"Failed to access {agent_id} status"
