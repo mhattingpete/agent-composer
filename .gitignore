@@ -41,6 +41,12 @@ env/
 .env.local
 .env.*.local
 
+# OAuth tokens (security-sensitive)
+*_token.json
+gmail_token.json
+calendar_token.json
+credentials.json
+
 # Database
 *.db
 *.sqlite

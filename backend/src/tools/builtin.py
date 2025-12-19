@@ -157,15 +157,18 @@ def read_workspace_file(path: str) -> str:
     """Read a file from the workspace.
 
     Args:
-        path: File path (relative to workspace or absolute)
+        path: File path (relative to workspace)
 
     Returns:
         File contents
     """
     try:
-        file_path = Path(path)
-        if not file_path.is_absolute():
-            file_path = WORKSPACE_DIR / path
+        # Resolve the path and ensure it's within workspace (prevent path traversal)
+        file_path = (WORKSPACE_DIR / path).resolve()
+        workspace_resolved = WORKSPACE_DIR.resolve()
+
+        if not file_path.is_relative_to(workspace_resolved):
+            return f"Error: Path '{path}' is outside the workspace directory"
 
         if not file_path.exists():
             return f"File not found: {path}"
@@ -179,16 +182,19 @@ def write_workspace_file(path: str, content: str) -> str:
     """Write content to a file in the workspace.
 
     Args:
-        path: File path (relative to workspace or absolute)
+        path: File path (relative to workspace)
         content: Content to write
 
     Returns:
         Success message or error
     """
     try:
-        file_path = Path(path)
-        if not file_path.is_absolute():
-            file_path = WORKSPACE_DIR / path
+        # Resolve the path and ensure it's within workspace (prevent path traversal)
+        file_path = (WORKSPACE_DIR / path).resolve()
+        workspace_resolved = WORKSPACE_DIR.resolve()
+
+        if not file_path.is_relative_to(workspace_resolved):
+            return f"Error: Path '{path}' is outside the workspace directory"
 
         # Create parent directories if needed
         file_path.parent.mkdir(parents=True, exist_ok=True)

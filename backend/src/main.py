@@ -21,7 +21,7 @@ _src_dir = str(Path(__file__).parent)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from agents import create_agent, get_agent_list
+from agents import AGENT_CONFIGS, create_agent, get_agent_list
 from conversations import store as conversation_store
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
@@ -75,11 +75,13 @@ def uv_add(package: str) -> str:
     Args:
         package: The package name to install (e.g., "yfinance", "pandas>=2.0")
     """
+    # Use relative path from this file's location
+    backend_dir = Path(__file__).parent.parent
     result = subprocess.run(
         ["uv", "add", package],
         capture_output=True,
         text=True,
-        cwd="/Users/map/Documents/Repos/agent-composer/backend",
+        cwd=str(backend_dir),
     )
     if result.returncode == 0:
         return f"Successfully installed {package}"
@@ -215,10 +217,15 @@ def get_agent(agent_id: str):
 # Create FastAPI app
 app = FastAPI(title="Agent Composer", description="Multi-agent AI assistant")
 
-# Add CORS middleware
+# Add CORS middleware - restricted to localhost for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -238,7 +245,7 @@ async def list_agents():
 # Conversation API endpoints
 # ============================================================================
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class CreateConversationRequest(BaseModel):
@@ -246,6 +253,14 @@ class CreateConversationRequest(BaseModel):
 
     agent_id: str = "general"
     title: str | None = None
+
+    @field_validator("agent_id")
+    @classmethod
+    def validate_agent_id(cls, v: str) -> str:
+        if v not in AGENT_CONFIGS:
+            valid_agents = list(AGENT_CONFIGS.keys())
+            raise ValueError(f"Invalid agent_id '{v}'. Must be one of: {valid_agents}")
+        return v
 
 
 class AddMessageRequest(BaseModel):
@@ -341,13 +356,12 @@ async def update_conversation_title(conv_id: str, request: UpdateTitleRequest):
 from agno.os.interfaces.agui import AGUI
 
 # Create AGUI routers for each agent and mount them at different paths
-# This allows agent selection via URL path: /agui/general, /agui/coding, /agui/research
-for agent_id in ["general", "coding", "research"]:
+# This allows agent selection via URL path: /{agent_id}/agui
+for agent_id in AGENT_CONFIGS:
     agent = get_agent(agent_id)
     agui = AGUI(agent=agent)
     router = agui.get_router()
-    # Mount at /agui/{agent_id} - the router itself has /agui endpoint
-    # So we strip that and mount the inner routes
+    # Mount at /{agent_id} - the router itself has /agui endpoint
     app.include_router(router, prefix=f"/{agent_id}", tags=[agent_id])
 
 # Also mount a default endpoint for backwards compatibility
