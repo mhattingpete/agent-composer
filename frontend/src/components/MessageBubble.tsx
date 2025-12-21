@@ -1,6 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import type { Message } from "../types/agui";
-import { ToolCallCard } from "./ToolCallCard";
+import { ToolCallsSection } from "./ToolCallsSection";
 
 interface MessageBubbleProps {
   message: Message;
@@ -25,13 +25,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm"
         }`}
       >
-        {/* Tool calls (shown before content for assistant) */}
+        {/* Tool calls in collapsible section (shown before content for assistant) */}
         {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="space-y-2 mb-3">
-            {message.toolCalls.map((toolCall) => (
-              <ToolCallCard key={toolCall.id} toolCall={toolCall} />
-            ))}
-          </div>
+          <ToolCallsSection toolCalls={message.toolCalls} />
         )}
 
         {/* Message content */}

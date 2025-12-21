@@ -15,28 +15,79 @@ from agno.tools import tool
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from loguru import logger
 
 # Ensure src directory is in path for uvicorn imports
 _src_dir = str(Path(__file__).parent)
 if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
-from agents import AGENT_CONFIGS, create_agent, get_agent_list
+from agents import (
+    AGENT_CONFIGS,
+    TEAM_CONFIGS,
+    TEAMS,
+    WORKFLOWS,
+    create_agent,
+    create_team,
+    get_agent_list,
+    get_teams_list,
+    get_workflows_list,
+)
 from conversations import store as conversation_store
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
 load_dotenv()
 
-# Configure logging - show only agent activity (model calls, tool calls, responses)
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s %(message)s",
-    datefmt="%H:%M:%S",
-)
-logging.getLogger("agno.agent.agent").setLevel(logging.DEBUG)
-
+# Paths
+LOG_DIR = Path(__file__).parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
 WORKSPACE_DIR = Path(__file__).parent.parent / "workspace"
 WORKSPACE_DIR.mkdir(exist_ok=True)
+
+# Configure loguru
+logger.remove()  # Remove default handler
+
+# Console: INFO and above with colors
+logger.add(
+    sys.stderr,
+    level="INFO",
+    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>",
+)
+
+# File: DEBUG and above, with rotation
+logger.add(
+    LOG_DIR / "agent.log",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    rotation="10 MB",
+    retention="7 days",
+)
+
+
+# Intercept standard logging and route to loguru
+class InterceptHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        # Get corresponding Loguru level
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+
+# Route all standard logging to loguru
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+# Set Agno loggers to DEBUG so their messages flow to loguru
+logging.getLogger("agno.agent.agent").setLevel(logging.DEBUG)
+logging.getLogger("agno.team.team").setLevel(logging.DEBUG)
 
 # Initialize the tool registry with built-in tools
 registry = ToolRegistry()
@@ -241,6 +292,18 @@ async def list_agents():
     return get_agent_list()
 
 
+@app.get("/teams")
+async def list_teams():
+    """List available teams for the frontend."""
+    return get_teams_list()
+
+
+@app.get("/workflows")
+async def list_workflows():
+    """List available workflows for the frontend."""
+    return get_workflows_list()
+
+
 # ============================================================================
 # Conversation API endpoints
 # ============================================================================
@@ -368,6 +431,16 @@ for agent_id in AGENT_CONFIGS:
 default_agent = get_agent("general")
 default_agui = AGUI(agent=default_agent)
 app.include_router(default_agui.get_router(), tags=["default"])
+
+# Mount AGUI routers for Teams - create with tools like agents
+for team_id in TEAM_CONFIGS:
+    team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
+    TEAMS[team_id] = team  # Store for reference
+    team_agui = AGUI(team=team)
+    app.include_router(team_agui.get_router(), prefix=f"/team-{team_id}", tags=[f"team-{team_id}"])
+
+# Note: Workflows don't have AGUI support yet - they need a custom endpoint
+# TODO: Add workflow execution endpoint using workflow.arun() or workflow.run()
 
 
 if __name__ == "__main__":

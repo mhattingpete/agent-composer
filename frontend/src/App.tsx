@@ -8,6 +8,7 @@ interface Agent {
   id: string;
   name: string;
   description: string;
+  type?: "agent" | "team";  // Added to distinguish agents from teams
 }
 
 export default function App() {
@@ -23,7 +24,7 @@ export default function App() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Chat hook
+  // Chat hook - pass conversation ID for Agno session persistence
   const {
     messages,
     setMessages,
@@ -31,18 +32,37 @@ export default function App() {
     error,
     sendMessage: sendChatMessage,
     stopGeneration,
-  } = useChat(selectedAgent);
+  } = useChat(selectedAgent, currentConversationId || undefined);
 
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Fetch available agents on mount
+  // Fetch available agents and teams on mount
   useEffect(() => {
-    fetch("/api/agents")
-      .then((res) => res.json())
-      .then((data) => setAgents(data))
-      .catch((err) => console.error("Failed to fetch agents:", err));
+    const fetchAgentsAndTeams = async () => {
+      try {
+        // Fetch agents
+        const agentsRes = await fetch("/api/agents");
+        const agentsData = await agentsRes.json();
+        const agents = agentsData.map((a: Agent) => ({ ...a, type: "agent" as const }));
+
+        // Fetch teams - prefix ID with "team-" to match backend URL pattern
+        const teamsRes = await fetch("/api/teams");
+        const teamsData = await teamsRes.json();
+        const teams = teamsData.map((t: Agent) => ({
+          ...t,
+          id: `team-${t.id}`,  // Backend expects /team-{id}/agui
+          type: "team" as const,
+        }));
+
+        // Combine: agents first, then teams
+        setAgents([...agents, ...teams]);
+      } catch (err) {
+        console.error("Failed to fetch agents/teams:", err);
+      }
+    };
+    fetchAgentsAndTeams();
   }, []);
 
   // Fetch conversations on mount
