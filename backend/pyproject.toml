@@ -28,6 +28,9 @@ dependencies = [
     # arXiv toolkit
     "arxiv>=2.0.0",
     "pypdf>=5.0.0",
+    "sqlalchemy>=2.0.45",
+    "mcp>=1.25.0",
+    "loguru>=0.7.3",
 ]
 
 [project.optional-dependencies]

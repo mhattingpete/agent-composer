@@ -5,11 +5,77 @@ run_python_code, uv_add, and save_and_run_python_file directly. Nested tools
 (web_search, fetch_url, etc.) are only accessible within the Python interpreter.
 """
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from agno.agent.agent import Agent
+from agno.db.sqlite import SqliteDb
 from agno.models.openrouter import OpenRouter
+from agno.team import Team
+from agno.tools.mcp import MCPTools
+from agno.workflow import Workflow
+
+# Paths
+DATA_DIR = Path(__file__).parent.parent / "data"
+CONFIG_DIR = Path(__file__).parent.parent / "config"
+DATA_DIR.mkdir(exist_ok=True)
+
+# Shared database for all agents - auto-creates tables for sessions and memory
+db = SqliteDb(db_file=str(DATA_DIR / "agent_composer.db"))
+
+
+def load_mcp_tools() -> list[MCPTools]:
+    """Load MCP tools from config/mcp_servers.json.
+
+    Config format:
+    {
+        "servers": [
+            {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]},
+            {"url": "http://localhost:3001/sse", "transport": "sse"}
+        ]
+    }
+    """
+    config_file = CONFIG_DIR / "mcp_servers.json"
+    if not config_file.exists():
+        return []
+
+    try:
+        config = json.loads(config_file.read_text())
+        servers = config.get("servers", [])
+
+        mcp_tools = []
+        for server in servers:
+            if not server.get("enabled", True):
+                continue
+
+            # Build command string if args provided
+            command = server.get("command")
+            if command and server.get("args"):
+                command = f"{command} {' '.join(server['args'])}"
+
+            try:
+                tool = MCPTools(
+                    command=command,
+                    url=server.get("url"),
+                    transport=server.get("transport", "stdio"),
+                    env=server.get("env"),
+                    tool_name_prefix=server.get("prefix"),
+                )
+                mcp_tools.append(tool)
+                print(f"Loaded MCP server: {server.get('name', command or server.get('url'))}")
+            except Exception as e:
+                print(f"Failed to load MCP server {server}: {e}")
+
+        return mcp_tools
+    except Exception as e:
+        print(f"Failed to load MCP config: {e}")
+        return []
+
+
+# Load MCP tools at module initialization
+MCP_TOOLS = load_mcp_tools()
 
 
 @dataclass
@@ -75,33 +141,6 @@ Best practices:
 
 Format code blocks with syntax highlighting.""",
     ),
-    "research": AgentConfig(
-        id="research",
-        name="Research Assistant",
-        description="Information gathering specialist for research tasks",
-        model_id="xiaomi/mimo-v2-flash:free",
-        instructions="""You are a research specialist focused on finding and synthesizing information.
-
-You excel at:
-- Finding relevant information from multiple sources
-- Summarizing complex topics clearly
-- Fact-checking and verification
-- Academic and technical research
-
-Use run_python_code to search and gather information. Inside it, you have access to:
-- web_search(query, num_results=5) - Search DuckDuckGo
-- fetch_url(url) - Fetch and extract text from web pages
-- arxiv_search(query) - Search academic papers (if available)
-- hn_get_top_stories() - Get Hacker News stories (if available)
-
-Research best practices:
-- Use multiple sources to verify information
-- Cite your sources with URLs
-- Present findings in a clear, organized format
-- Distinguish between facts and opinions
-
-Format research findings with clear headings and bullet points.""",
-    ),
 }
 
 
@@ -151,10 +190,172 @@ print(results)
 
 NEVER call tools directly. ALWAYS wrap them in run_python_code."""
 
+    # Combine explicit tools with MCP tools
+    all_tools = list(tools) + MCP_TOOLS
+
     return Agent(
         model=OpenRouter(id=config.model_id),
-        tools=tools,
+        tools=all_tools,
         description=config.description,
         instructions=full_instructions,
         debug_mode=debug_mode,
+        # Enable Agno persistence - sessions are stored in SQLite
+        db=db,
+        add_history_to_context=True,  # Load previous messages from session
+        num_history_runs=5,  # Include last 5 conversation turns in context
     )
+
+
+# =============================================================================
+# Teams - Multi-agent collaboration
+# =============================================================================
+
+# Team configurations - similar to agent configs
+TEAM_CONFIGS = {
+    "research": {
+        "name": "research",
+        "description": "A research team that gathers, analyzes, and presents information",
+        "members": [
+            {"name": "Researcher", "role": "Find and gather relevant information", "has_tools": True},
+            {"name": "Analyst", "role": "Analyze and synthesize research findings", "has_tools": False},
+            {"name": "Writer", "role": "Create clear, well-structured content", "has_tools": False},
+        ],
+    },
+}
+
+
+def create_team(
+    team_id: str,
+    tools: list[Callable],
+    tool_docs: str,
+) -> Team:
+    """Create a team instance with the given configuration.
+
+    Args:
+        team_id: The team ID (research, etc.)
+        tools: List of tool functions (run_python_code, etc.)
+        tool_docs: Generated documentation for nested Python tools
+
+    Returns:
+        Configured Team instance
+    """
+    if team_id not in TEAM_CONFIGS:
+        raise ValueError(f"Unknown team: {team_id}. Available: {list(TEAM_CONFIGS.keys())}")
+
+    config = TEAM_CONFIGS[team_id]
+
+    # Build member agents with role-specific instructions
+    ROLE_INSTRUCTIONS = {
+        "Researcher": """You are the Researcher on a research team.
+Your role: Find and gather relevant information using web search.
+
+CRITICAL: You MUST use run_python_code with web_search() for EVERY research task.
+NEVER make up information. NEVER guess. ONLY report what you find from searches.
+
+Example - searching for information:
+```python
+results = web_search("Kuatro Group founders Denmark", num_results=5)
+print(results)
+```
+
+Example - fetching a specific URL for more details:
+```python
+content = fetch_url("https://example.com/about")
+print(content)
+```
+
+Always search first, then report the ACTUAL results you found. Include source URLs.""",
+
+        "Analyst": """You are the Analyst on a research team.
+Your role: Analyze and synthesize the research findings provided to you.
+Identify key patterns, verify consistency across sources, and highlight important insights.
+Be critical - note if information seems incomplete or contradictory.""",
+
+        "Writer": """You are the Writer on a research team.
+Your role: Create clear, well-structured content based on the analysis.
+Use markdown formatting. Cite sources when available.
+Only include information that was actually found - never add made-up details.""",
+    }
+
+    members = []
+    for member_config in config["members"]:
+        member_tools = tools if member_config.get("has_tools") else []
+
+        # Use role-specific instructions or fall back to generic
+        base_instructions = ROLE_INSTRUCTIONS.get(
+            member_config["name"],
+            f"You are the {member_config['name']}. Your role: {member_config['role']}"
+        )
+
+        # Add tool docs for members with tools
+        member_instructions = base_instructions
+        if member_config.get("has_tools"):
+            member_instructions += f"\n\n{tool_docs}"
+
+        members.append(Agent(
+            name=member_config["name"],
+            role=member_config["role"],
+            model=OpenRouter(id="mistralai/devstral-2512:free"),
+            tools=member_tools,
+            instructions=member_instructions,
+            debug_mode=True,
+        ))
+
+    return Team(
+        name=config["name"],
+        model=OpenRouter(id="mistralai/devstral-2512:free"),
+        description=config["description"],
+        members=members,
+        db=db,
+        add_history_to_context=True,
+        debug_mode=True,
+    )
+
+
+# Teams dict - populated by main.py after tools are defined
+TEAMS: dict[str, Team] = {}
+
+
+# =============================================================================
+# Workflows - Deterministic pipelines
+# =============================================================================
+
+# Content Workflow: Research → Write (sequential steps)
+content_workflow = Workflow(
+    name="content",
+    description="Create content by researching a topic and writing about it",
+    steps=[
+        Agent(
+            name="Researcher",
+            model=OpenRouter(id="mistralai/devstral-2512:free"),
+            instructions="Research the given topic thoroughly. Return your findings.",
+        ),
+        Agent(
+            name="Writer",
+            model=OpenRouter(id="mistralai/devstral-2512:free"),
+            instructions="Based on the research provided, write a clear and engaging article. Use markdown.",
+        ),
+    ],
+    db=db,
+)
+
+# Export workflows dict for main.py
+WORKFLOWS: dict[str, Workflow] = {
+    "content": content_workflow,
+}
+
+
+def get_teams_list() -> list[dict]:
+    """Return list of available teams for the frontend."""
+    return [
+        {"id": team_id, "name": config["name"], "description": config["description"], "type": "team"}
+        for team_id, config in TEAM_CONFIGS.items()
+    ]
+
+
+def get_workflows_list() -> list[dict]:
+    """Return list of available workflows for the frontend."""
+    return [
+        {"id": name, "name": workflow.name, "description": workflow.description, "type": "workflow"}
+        for name, workflow in WORKFLOWS.items()
+    ]
