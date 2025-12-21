@@ -65,7 +65,12 @@ logger.add(
 
 
 # Intercept standard logging and route to loguru
+# This is necessary because third-party libraries (Agno, FastAPI, uvicorn) use
+# stdlib logging internally. The InterceptHandler captures their logs and routes
+# them through loguru so all logs have consistent formatting and go to the same sinks.
 class InterceptHandler(logging.Handler):
+    """Route stdlib logging to loguru for unified log handling."""
+
     def emit(self, record: logging.LogRecord) -> None:
         # Get corresponding Loguru level
         try:
@@ -82,12 +87,16 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-# Route all standard logging to loguru
+# Route all stdlib logging to loguru (for third-party libs like Agno, FastAPI, uvicorn)
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 # Set Agno loggers to DEBUG so their messages flow to loguru
 logging.getLogger("agno.agent.agent").setLevel(logging.DEBUG)
 logging.getLogger("agno.team.team").setLevel(logging.DEBUG)
+
+# For our own code, use loguru directly:
+# from loguru import logger
+# logger.info("message")
 
 # Initialize the tool registry with built-in tools
 registry = ToolRegistry()
