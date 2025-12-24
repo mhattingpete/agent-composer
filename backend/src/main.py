@@ -3,6 +3,9 @@
 This module provides multiple agents (general, coding, research) that can run
 Python code and install packages via uv. Tools registered in the ToolRegistry
 are available as functions within the interpreter.
+
+Uses AgentOS for unified agent management and AG-UI protocol support.
+Frontend: Use Agno's Agent UI (npx create-agent-ui@latest) connecting to port 7777.
 """
 
 import logging
@@ -11,10 +14,10 @@ import sys
 from io import StringIO
 from pathlib import Path
 
+from agno.os import AgentOS
+from agno.os.interfaces.agui import AGUI
 from agno.tools import tool
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 # Ensure src directory is in path for uvicorn imports
@@ -26,14 +29,9 @@ from agents import (
     AGENT_CONFIGS,
     TEAM_CONFIGS,
     TEAMS,
-    WORKFLOWS,
     create_agent,
     create_team,
-    get_agent_list,
-    get_teams_list,
-    get_workflows_list,
 )
-from conversations import store as conversation_store
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
 load_dotenv()
@@ -274,185 +272,44 @@ def get_agent(agent_id: str):
     )
 
 
-# Create FastAPI app
-app = FastAPI(title="Agent Composer", description="Multi-agent AI assistant")
-
-# Add CORS middleware - restricted to localhost for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/agents")
-async def list_agents():
-    """List available agents for the frontend dropdown.
-
-    Frontend calls /api/agents, Vite proxy strips /api, so backend sees /agents.
-    """
-    return get_agent_list()
-
-
-@app.get("/teams")
-async def list_teams():
-    """List available teams for the frontend."""
-    return get_teams_list()
-
-
-@app.get("/workflows")
-async def list_workflows():
-    """List available workflows for the frontend."""
-    return get_workflows_list()
-
-
 # ============================================================================
-# Conversation API endpoints
+# Create all agents and teams
 # ============================================================================
 
-from pydantic import BaseModel, field_validator
+# Create agent instances
+agents = [get_agent(agent_id) for agent_id in AGENT_CONFIGS]
 
-
-class CreateConversationRequest(BaseModel):
-    """Request body for creating a conversation."""
-
-    agent_id: str = "general"
-    title: str | None = None
-
-    @field_validator("agent_id")
-    @classmethod
-    def validate_agent_id(cls, v: str) -> str:
-        if v not in AGENT_CONFIGS:
-            valid_agents = list(AGENT_CONFIGS.keys())
-            raise ValueError(f"Invalid agent_id '{v}'. Must be one of: {valid_agents}")
-        return v
-
-
-class AddMessageRequest(BaseModel):
-    """Request body for adding a message to a conversation."""
-
-    role: str
-    content: str
-    tool_calls: list[dict] = []
-    message_id: str | None = None
-
-
-class UpdateTitleRequest(BaseModel):
-    """Request body for updating conversation title."""
-
-    title: str
-
-
-@app.get("/conversations")
-async def list_conversations():
-    """List all conversations (summaries only, no messages)."""
-    conversations = conversation_store.list_all()
-    return [conv.to_summary() for conv in conversations]
-
-
-@app.post("/conversations")
-async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
-    conversation = conversation_store.create(
-        agent_id=request.agent_id,
-        title=request.title,
-    )
-    return conversation.to_dict()
-
-
-@app.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str):
-    """Get a conversation with all its messages."""
-    conversation = conversation_store.get(conv_id)
-    if not conversation:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return conversation.to_dict()
-
-
-@app.delete("/conversations/{conv_id}")
-async def delete_conversation(conv_id: str):
-    """Delete a conversation."""
-    deleted = conversation_store.delete(conv_id)
-    if not deleted:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {"status": "deleted"}
-
-
-@app.post("/conversations/{conv_id}/messages")
-async def add_message(conv_id: str, request: AddMessageRequest):
-    """Add a message to a conversation."""
-    message = conversation_store.add_message(
-        conv_id=conv_id,
-        role=request.role,
-        content=request.content,
-        tool_calls=request.tool_calls,
-        message_id=request.message_id,
-    )
-    if not message:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {
-        "id": message.id,
-        "role": message.role,
-        "content": message.content,
-        "tool_calls": message.tool_calls,
-        "timestamp": message.timestamp,
-    }
-
-
-@app.patch("/conversations/{conv_id}/title")
-async def update_conversation_title(conv_id: str, request: UpdateTitleRequest):
-    """Update a conversation's title."""
-    updated = conversation_store.update_title(conv_id, request.title)
-    if not updated:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {"status": "updated", "title": request.title}
-
-
-# ============================================================================
-# Import AGUI for streaming
-from agno.os.interfaces.agui import AGUI
-
-# Create AGUI routers for each agent and mount them at different paths
-# This allows agent selection via URL path: /{agent_id}/agui
-for agent_id in AGENT_CONFIGS:
-    agent = get_agent(agent_id)
-    agui = AGUI(agent=agent)
-    router = agui.get_router()
-    # Mount at /{agent_id} - the router itself has /agui endpoint
-    app.include_router(router, prefix=f"/{agent_id}", tags=[agent_id])
-
-# Also mount a default endpoint for backwards compatibility
-default_agent = get_agent("general")
-default_agui = AGUI(agent=default_agent)
-app.include_router(default_agui.get_router(), tags=["default"])
-
-# Mount AGUI routers for Teams - create with tools like agents
+# Create team instances
+teams = []
 for team_id in TEAM_CONFIGS:
     team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
-    TEAMS[team_id] = team  # Store for reference
-    team_agui = AGUI(team=team)
-    app.include_router(team_agui.get_router(), prefix=f"/team-{team_id}", tags=[f"team-{team_id}"])
+    TEAMS[team_id] = team
+    teams.append(team)
 
-# Note: Workflows don't have AGUI support yet - they need a custom endpoint
-# TODO: Add workflow execution endpoint using workflow.arun() or workflow.run()
+# Create AGUI interfaces for all agents and teams
+interfaces = []
+for agent in agents:
+    interfaces.append(AGUI(agent=agent))
+for team in teams:
+    interfaces.append(AGUI(team=team))
+
+# ============================================================================
+# Create AgentOS app
+# ============================================================================
+
+agent_os = AgentOS(
+    agents=agents,
+    teams=teams,
+    interfaces=interfaces,
+)
+
+# Get the FastAPI app from AgentOS
+app = agent_os.get_app()
+
+logger.info(f"AgentOS initialized with {len(agents)} agents and {len(teams)} teams")
+logger.info("Agent UI: npx create-agent-ui@latest (connects to localhost:7777)")
 
 
 if __name__ == "__main__":
-    # Test with general agent
-    agent = get_agent("general")
-    agent.print_response("Search the web for 'Python best practices 2024' and summarize the top 3 results.")
+    # Serve with AgentOS on port 7777 (Agent UI default)
+    agent_os.serve(app="main:app", port=7777, reload=True)
