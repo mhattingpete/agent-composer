@@ -8,15 +8,11 @@ Uses AgentOS for unified agent management and AG-UI protocol support.
 Frontend: Use Agno's Agent UI (npx create-agent-ui@latest) connecting to port 7777.
 """
 
-import logging
-import subprocess
 import sys
-from io import StringIO
 from pathlib import Path
 
 from agno.os import AgentOS
 from agno.os.interfaces.agui import AGUI
-from agno.tools import tool
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -32,71 +28,19 @@ from agents import (
     create_agent,
     create_team,
 )
+from code_tools import AGENT_TOOLS, set_tool_registry
+from logging_config import setup_logging
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
 load_dotenv()
 
-# Paths
-LOG_DIR = Path(__file__).parent.parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-WORKSPACE_DIR = Path(__file__).parent.parent / "workspace"
-WORKSPACE_DIR.mkdir(exist_ok=True)
+# Configure logging
+setup_logging()
 
-# Configure loguru
-logger.remove()  # Remove default handler
+# ============================================================================
+# Tool Registry Setup
+# ============================================================================
 
-# Console: INFO and above with colors
-logger.add(
-    sys.stderr,
-    level="INFO",
-    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>",
-)
-
-# File: DEBUG and above, with rotation
-logger.add(
-    LOG_DIR / "agent.log",
-    level="DEBUG",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    rotation="10 MB",
-    retention="7 days",
-)
-
-
-# Intercept standard logging and route to loguru
-# This is necessary because third-party libraries (Agno, FastAPI, uvicorn) use
-# stdlib logging internally. The InterceptHandler captures their logs and routes
-# them through loguru so all logs have consistent formatting and go to the same sinks.
-class InterceptHandler(logging.Handler):
-    """Route stdlib logging to loguru for unified log handling."""
-
-    def emit(self, record: logging.LogRecord) -> None:
-        # Get corresponding Loguru level
-        try:
-            level = logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno
-
-        # Find caller from where originated the logged message
-        frame, depth = logging.currentframe(), 2
-        while frame and frame.f_code.co_filename == logging.__file__:
-            frame = frame.f_back
-            depth += 1
-
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
-
-# Route all stdlib logging to loguru (for third-party libs like Agno, FastAPI, uvicorn)
-logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-
-# Set Agno loggers to DEBUG so their messages flow to loguru
-logging.getLogger("agno.agent.agent").setLevel(logging.DEBUG)
-logging.getLogger("agno.team.team").setLevel(logging.DEBUG)
-
-# For our own code, use loguru directly:
-# from loguru import logger
-# logger.info("message")
-
-# Initialize the tool registry with built-in tools
 registry = ToolRegistry()
 for name, (func, description) in BUILTIN_TOOLS.items():
     registry.register(name, func, description)
@@ -113,7 +57,6 @@ if arxiv:
     print(f"Loaded arXiv tools: {registered}")
 
 # Load Google toolkits (requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_PROJECT_ID)
-# These will prompt for OAuth on first use
 gmail = load_agno_toolkit("gmail")
 if gmail:
     registered = register_toolkit(registry, gmail, prefix="gmail_")
@@ -124,142 +67,15 @@ if calendar:
     registered = register_toolkit(registry, calendar, prefix="cal_")
     print(f"Loaded Calendar tools: {registered}")
 
-
-@tool
-def uv_add(package: str) -> str:
-    """
-    Install a Python package using uv.
-
-    Args:
-        package: The package name to install (e.g., "yfinance", "pandas>=2.0")
-    """
-    # Use relative path from this file's location
-    backend_dir = Path(__file__).parent.parent
-    result = subprocess.run(
-        ["uv", "add", package],
-        capture_output=True,
-        text=True,
-        cwd=str(backend_dir),
-    )
-    if result.returncode == 0:
-        return f"Successfully installed {package}"
-    return f"Failed to install {package}: {result.stderr}"
-
-
-def _run_code_in_namespace(code: str, namespace: dict) -> None:
-    """Helper to run code - separated to avoid hook false positives."""
-    # Using compile + built-in execution for code interpreter
-    compiled = compile(code, "<string>", "exec")  # noqa: S102
-    builtins = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
-    builtins["exec"](compiled, namespace)
-
-
-@tool
-def run_python_code(code: str) -> str:
-    """
-    Run Python code with access to many built-in tools.
-
-    Available tools (call directly, no imports needed):
-
-    **Web & HTTP:**
-    - web_search(query, num_results=5) - Search the web via DuckDuckGo
-    - fetch_url(url, extract_text=True) - Fetch URL content
-    - http_get(url, headers=None) - HTTP GET request
-    - http_post(url, data=None, json_data=None, headers=None) - HTTP POST
-
-    **System:**
-    - shell(command, cwd=None, timeout=30) - Run shell commands
-    - read_file(path) - Read file from workspace
-    - write_file(path, content) - Write file to workspace
-    - list_files(pattern="*") - List workspace files
-
-    **Hacker News (if loaded):**
-    - hn_get_top_stories(num_stories=10) - Get top HN stories
-    - hn_get_new_stories(num_stories=10) - Get newest stories
-    - hn_get_user_details(username) - Get user info
-
-    **arXiv (if loaded):**
-    - arxiv_search(query, max_results=5) - Search academic papers
-
-    **Gmail (if configured):**
-    - gmail_get_latest_emails(count) - Get recent emails
-    - gmail_send_email(to, subject, body) - Send email
-    - gmail_search_emails(query, count) - Search emails
-
-    **Calendar (if configured):**
-    - cal_list_events(limit=10) - List upcoming events
-    - cal_create_event(...) - Create calendar event
-
-    Args:
-        code: The Python code to run.
-    """
-    # Build namespace with builtins + registered tools
-    tool_namespace = registry.get_namespace()
-    run_globals = {
-        "__builtins__": __builtins__,
-        **tool_namespace,
-    }
-
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    redirected_output = StringIO()
-    redirected_error = StringIO()
-    sys.stdout = redirected_output
-    sys.stderr = redirected_error
-
-    try:
-        _run_code_in_namespace(code, run_globals)
-        output = redirected_output.getvalue()
-        error = redirected_error.getvalue()
-        if error:
-            return f"Output:\n{output}\n\nErrors:\n{error}"
-        return output if output else "Code ran successfully (no output)"
-    except Exception as e:
-        return f"Error running code: {e}"
-    finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-
-
-@tool
-def save_and_run_python_file(file_name: str, code: str) -> str:
-    """
-    Save Python code to a file in the workspace and run it.
-
-    Note: Files run this way do NOT have access to built-in tools.
-    Use run_python_code for code that needs web_search, fetch_url, etc.
-
-    Args:
-        file_name: Name of the file to save (e.g., "script.py")
-        code: The Python code to save and run.
-    """
-    if not file_name.endswith(".py"):
-        file_name += ".py"
-
-    file_path = WORKSPACE_DIR / file_name
-    file_path.write_text(code)
-
-    result = subprocess.run(
-        ["python", str(file_path)],
-        capture_output=True,
-        text=True,
-        cwd=str(WORKSPACE_DIR),
-    )
-
-    output = result.stdout
-    error = result.stderr
-    if result.returncode != 0:
-        return f"Error running {file_name}:\n{error}"
-    if error:
-        return f"Output:\n{output}\n\nWarnings:\n{error}"
-    return output if output else f"{file_name} ran successfully (no output)"
-
+# Connect registry to code tools
+set_tool_registry(registry)
 
 # Generate dynamic tool documentation for agent instructions
 tool_docs = registry.generate_instructions()
 
-# Shared tools for all agents
-AGENT_TOOLS = [uv_add, run_python_code, save_and_run_python_file]
+# ============================================================================
+# Agent and Team Creation
+# ============================================================================
 
 
 def get_agent(agent_id: str):
@@ -271,10 +87,6 @@ def get_agent(agent_id: str):
         debug_mode=True,
     )
 
-
-# ============================================================================
-# Create all agents and teams
-# ============================================================================
 
 # Create agent instances
 agents = [get_agent(agent_id) for agent_id in AGENT_CONFIGS]
@@ -294,7 +106,7 @@ for team in teams:
     interfaces.append(AGUI(team=team))
 
 # ============================================================================
-# Create AgentOS app
+# AgentOS Application
 # ============================================================================
 
 agent_os = AgentOS(
