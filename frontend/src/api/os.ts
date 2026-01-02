@@ -166,3 +166,218 @@ export const deleteTeamSessionAPI = async (
   }
   return response
 }
+
+// =============================================================================
+// Config API - for managing custom agents and teams
+// =============================================================================
+
+export interface ModelInfo {
+  id: string
+  name: string
+  provider: string
+}
+
+export interface AgentConfigCreate {
+  name: string
+  description: string
+  model_id: string
+  instructions: string
+}
+
+export interface AgentConfigResponse extends AgentConfigCreate {
+  id: string
+  builtin: boolean
+}
+
+export interface TeamMember {
+  name: string
+  role: string
+  has_tools: boolean
+}
+
+export interface TeamConfigCreate {
+  name: string
+  description: string
+  members: TeamMember[]
+}
+
+export interface TeamConfigResponse extends TeamConfigCreate {
+  id: string
+  builtin: boolean
+}
+
+export const getModelsAPI = async (
+  endpoint: string,
+  authToken?: string
+): Promise<ModelInfo[]> => {
+  try {
+    const response = await fetch(APIRoutes.GetModels(endpoint), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to fetch models: ${response.statusText}`)
+      return []
+    }
+    return response.json()
+  } catch {
+    toast.error('Error fetching models')
+    return []
+  }
+}
+
+export const getCustomAgentsAPI = async (
+  endpoint: string,
+  authToken?: string
+): Promise<AgentConfigResponse[]> => {
+  try {
+    const response = await fetch(APIRoutes.GetCustomAgents(endpoint), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to fetch custom agents: ${response.statusText}`)
+      return []
+    }
+    return response.json()
+  } catch {
+    toast.error('Error fetching custom agents')
+    return []
+  }
+}
+
+export const createAgentAPI = async (
+  endpoint: string,
+  agent: AgentConfigCreate,
+  authToken?: string
+): Promise<AgentConfigResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.CreateAgent(endpoint), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify(agent)
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      toast.error(`Failed to create agent: ${error.detail || response.statusText}`)
+      return null
+    }
+    toast.success('Agent created successfully')
+    return response.json()
+  } catch {
+    toast.error('Error creating agent')
+    return null
+  }
+}
+
+export const updateAgentAPI = async (
+  endpoint: string,
+  agentId: string,
+  updates: Partial<AgentConfigCreate>,
+  authToken?: string
+): Promise<AgentConfigResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.UpdateAgent(endpoint, agentId), {
+      method: 'PUT',
+      headers: createHeaders(authToken),
+      body: JSON.stringify(updates)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to update agent: ${response.statusText}`)
+      return null
+    }
+    toast.success('Agent updated successfully')
+    return response.json()
+  } catch {
+    toast.error('Error updating agent')
+    return null
+  }
+}
+
+export const deleteAgentAPI = async (
+  endpoint: string,
+  agentId: string,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(APIRoutes.DeleteAgent(endpoint, agentId), {
+      method: 'DELETE',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to delete agent: ${response.statusText}`)
+      return false
+    }
+    toast.success('Agent deleted successfully')
+    return true
+  } catch {
+    toast.error('Error deleting agent')
+    return false
+  }
+}
+
+export const getCustomTeamsAPI = async (
+  endpoint: string,
+  authToken?: string
+): Promise<TeamConfigResponse[]> => {
+  try {
+    const response = await fetch(APIRoutes.GetCustomTeams(endpoint), {
+      method: 'GET',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to fetch custom teams: ${response.statusText}`)
+      return []
+    }
+    return response.json()
+  } catch {
+    toast.error('Error fetching custom teams')
+    return []
+  }
+}
+
+export const createTeamAPI = async (
+  endpoint: string,
+  team: TeamConfigCreate,
+  authToken?: string
+): Promise<TeamConfigResponse | null> => {
+  try {
+    const response = await fetch(APIRoutes.CreateTeam(endpoint), {
+      method: 'POST',
+      headers: createHeaders(authToken),
+      body: JSON.stringify(team)
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      toast.error(`Failed to create team: ${error.detail || response.statusText}`)
+      return null
+    }
+    toast.success('Team created successfully')
+    return response.json()
+  } catch {
+    toast.error('Error creating team')
+    return null
+  }
+}
+
+export const deleteTeamConfigAPI = async (
+  endpoint: string,
+  teamId: string,
+  authToken?: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(APIRoutes.DeleteTeam(endpoint, teamId), {
+      method: 'DELETE',
+      headers: createHeaders(authToken)
+    })
+    if (!response.ok) {
+      toast.error(`Failed to delete team: ${response.statusText}`)
+      return false
+    }
+    toast.success('Team deleted successfully')
+    return true
+  } catch {
+    toast.error('Error deleting team')
+    return false
+  }
+}

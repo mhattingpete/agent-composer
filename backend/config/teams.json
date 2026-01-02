@@ -1,0 +1,19 @@
+[
+  {
+    "id": "test-fa5783ad",
+    "name": "test",
+    "description": "A test team",
+    "members": [
+      {
+        "name": "Tester",
+        "role": "test code and UI",
+        "has_tools": true
+      },
+      {
+        "name": "Analyzer",
+        "role": "Analyses test results and provides feedback",
+        "has_tools": true
+      }
+    ]
+  }
+]

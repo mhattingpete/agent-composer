@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { ModeSelector } from '@/components/chat/Sidebar/ModeSelector'
 import { EntitySelector } from '@/components/chat/Sidebar/EntitySelector'
+import { ConfigModal } from '@/components/chat/Sidebar/ConfigModal'
 import useChatActions from '@/hooks/useChatActions'
 import { useStore } from '@/store'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -209,6 +210,7 @@ const Sidebar = ({
   envToken?: string
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
   const { clearChat, focusChatInput, initialize } = useChatActions()
   const {
     messages,
@@ -295,7 +297,20 @@ const Sidebar = ({
                   ) : (
                     <>
                       <ModeSelector />
-                      <EntitySelector />
+                      <div className="flex w-full items-center gap-1">
+                        <div className="flex-1">
+                          <EntitySelector />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setIsConfigModalOpen(true)}
+                          className="h-9 w-9 shrink-0 rounded-xl border border-primary/15 bg-primaryAccent hover:bg-primary/10"
+                          title={`Create new ${mode}`}
+                        >
+                          <Icon type="plus-icon" size="xs" />
+                        </Button>
+                      </div>
                       {selectedModel && (agentId || teamId) && (
                         <ModelDisplay model={selectedModel} />
                       )}
@@ -308,6 +323,13 @@ const Sidebar = ({
           </>
         )}
       </motion.div>
+
+      {/* Config Modal for creating agents/teams */}
+      <ConfigModal
+        open={isConfigModalOpen}
+        onOpenChange={setIsConfigModalOpen}
+        mode={mode}
+      />
     </motion.aside>
   )
 }

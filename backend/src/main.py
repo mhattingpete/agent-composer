@@ -11,8 +11,10 @@ Frontend: Use Agno's Agent UI (npx create-agent-ui@latest) connecting to port 77
 import sys
 from pathlib import Path
 
+from agno.agent.agent import Agent
 from agno.os import AgentOS
 from agno.os.interfaces.agui import AGUI
+from agno.team import Team
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -23,12 +25,19 @@ if _src_dir not in sys.path:
 
 from agents import (
     AGENT_CONFIGS,
+    BUILTIN_AGENT_CONFIGS,
+    BUILTIN_TEAM_CONFIGS,
     TEAM_CONFIGS,
     TEAMS,
     create_agent,
     create_team,
+    get_all_agent_configs,
+    get_all_team_configs,
+    load_custom_agents,
+    load_custom_teams,
 )
 from code_tools import AGENT_TOOLS, set_tool_registry
+from config_routes import router as config_router
 from logging_config import setup_logging
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
@@ -74,7 +83,58 @@ set_tool_registry(registry)
 tool_docs = registry.generate_instructions()
 
 # ============================================================================
-# Agent and Team Creation
+# Dynamic Agent/Team Cache
+# ============================================================================
+
+# Cache for dynamically created agents and teams
+_dynamic_agents: dict[str, Agent] = {}
+_dynamic_teams: dict[str, Team] = {}
+
+
+def get_or_create_agent(agent_id: str) -> Agent:
+    """Get an agent by ID, creating it dynamically if needed.
+
+    This enables hot-loading of custom agents without server restart.
+    Built-in agents are created once and cached.
+    Custom agents are created on first request and cached.
+    """
+    # Check cache first
+    if agent_id in _dynamic_agents:
+        return _dynamic_agents[agent_id]
+
+    # Create the agent (works for both built-in and custom)
+    agent = create_agent(
+        agent_id=agent_id,
+        tools=AGENT_TOOLS,
+        tool_docs=tool_docs,
+        debug_mode=True,
+    )
+    _dynamic_agents[agent_id] = agent
+    return agent
+
+
+def get_or_create_team(team_id: str) -> Team:
+    """Get a team by ID, creating it dynamically if needed."""
+    if team_id in _dynamic_teams:
+        return _dynamic_teams[team_id]
+
+    team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
+    _dynamic_teams[team_id] = team
+    return team
+
+
+def is_custom_agent(agent_id: str) -> bool:
+    """Check if an agent ID refers to a custom (non-built-in) agent."""
+    return agent_id not in BUILTIN_AGENT_CONFIGS
+
+
+def is_custom_team(team_id: str) -> bool:
+    """Check if a team ID refers to a custom (non-built-in) team."""
+    return team_id not in BUILTIN_TEAM_CONFIGS
+
+
+# ============================================================================
+# Agent and Team Creation (for AgentOS initialization)
 # ============================================================================
 
 
@@ -88,14 +148,19 @@ def get_agent(agent_id: str):
     )
 
 
-# Create agent instances
-agents = [get_agent(agent_id) for agent_id in AGENT_CONFIGS]
+# Create agent instances for built-in agents only (custom loaded dynamically)
+agents = []
+for agent_id in AGENT_CONFIGS:
+    agent = get_agent(agent_id)
+    agents.append(agent)
+    _dynamic_agents[agent_id] = agent  # Cache using config ID
 
 # Create team instances
 teams = []
 for team_id in TEAM_CONFIGS:
     team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
     TEAMS[team_id] = team
+    _dynamic_teams[team_id] = team
     teams.append(team)
 
 # Create AGUI interfaces for all agents and teams
@@ -117,6 +182,9 @@ agent_os = AgentOS(
 
 # Get the FastAPI app from AgentOS
 app = agent_os.get_app()
+
+# Add config routes for managing agents and teams
+app.include_router(config_router)
 
 logger.info(f"AgentOS initialized with {len(agents)} agents and {len(teams)} teams")
 logger.info("Agent UI: npx create-agent-ui@latest (connects to localhost:7777)")
