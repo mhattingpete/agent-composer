@@ -89,8 +89,8 @@ class AgentConfig:
     instructions: str
 
 
-# Agent configurations - all share the same tools, differ in instructions and models
-AGENT_CONFIGS: dict[str, AgentConfig] = {
+# Built-in agent configurations - read-only, always available
+BUILTIN_AGENT_CONFIGS: dict[str, AgentConfig] = {
     "general": AgentConfig(
         id="general",
         name="General Assistant",
@@ -144,11 +144,57 @@ Format code blocks with syntax highlighting.""",
 }
 
 
+def load_custom_agents() -> dict[str, AgentConfig]:
+    """Load custom agent configurations from JSON file."""
+    agents_file = CONFIG_DIR / "agents.json"
+    if not agents_file.exists():
+        return {}
+
+    try:
+        data = json.loads(agents_file.read_text())
+        return {
+            agent["id"]: AgentConfig(
+                id=agent["id"],
+                name=agent["name"],
+                description=agent.get("description", ""),
+                model_id=agent["model_id"],
+                instructions=agent.get("instructions", "You are a helpful AI assistant."),
+            )
+            for agent in data
+        }
+    except (json.JSONDecodeError, KeyError, OSError) as e:
+        print(f"Failed to load custom agents: {e}")
+        return {}
+
+
+def get_all_agent_configs() -> dict[str, AgentConfig]:
+    """Get all agent configs (built-in + custom), with custom configs loaded fresh."""
+    custom = load_custom_agents()
+    return {**BUILTIN_AGENT_CONFIGS, **custom}
+
+
+# Combined agent configs - use get_all_agent_configs() for fresh data
+AGENT_CONFIGS: dict[str, AgentConfig] = get_all_agent_configs()
+
+
+def reload_agent_configs() -> None:
+    """Reload agent configs from JSON. Call after config changes."""
+    global AGENT_CONFIGS
+    AGENT_CONFIGS = get_all_agent_configs()
+
+
 def get_agent_list() -> list[dict]:
     """Return list of available agents for the frontend dropdown."""
+    # Use fresh configs to pick up any changes
+    all_configs = get_all_agent_configs()
     return [
-        {"id": config.id, "name": config.name, "description": config.description}
-        for config in AGENT_CONFIGS.values()
+        {
+            "id": config.id,
+            "name": config.name,
+            "description": config.description,
+            "builtin": config.id in BUILTIN_AGENT_CONFIGS,
+        }
+        for config in all_configs.values()
     ]
 
 
@@ -161,7 +207,7 @@ def create_agent(
     """Create an agent instance with the given configuration.
 
     Args:
-        agent_id: The agent ID (general, coding, research)
+        agent_id: The agent ID (general, coding, or custom)
         tools: List of tool functions (run_python_code, uv_add, etc.)
         tool_docs: Generated documentation for nested Python tools
         debug_mode: Enable debug logging
@@ -169,10 +215,13 @@ def create_agent(
     Returns:
         Configured Agent instance
     """
-    if agent_id not in AGENT_CONFIGS:
-        raise ValueError(f"Unknown agent: {agent_id}. Available: {list(AGENT_CONFIGS.keys())}")
+    # Use fresh configs to pick up custom agents
+    all_configs = get_all_agent_configs()
 
-    config = AGENT_CONFIGS[agent_id]
+    if agent_id not in all_configs:
+        raise ValueError(f"Unknown agent: {agent_id}. Available: {list(all_configs.keys())}")
+
+    config = all_configs[agent_id]
 
     # Build full instructions with tool documentation
     full_instructions = f"""{config.instructions}
@@ -210,8 +259,8 @@ NEVER call tools directly. ALWAYS wrap them in run_python_code."""
 # Teams - Multi-agent collaboration
 # =============================================================================
 
-# Team configurations - similar to agent configs
-TEAM_CONFIGS = {
+# Built-in team configurations - read-only, always available
+BUILTIN_TEAM_CONFIGS = {
     "research": {
         "name": "research",
         "description": "A research team that gathers, analyzes, and presents information",
@@ -224,6 +273,30 @@ TEAM_CONFIGS = {
 }
 
 
+def load_custom_teams() -> dict[str, dict]:
+    """Load custom team configurations from JSON file."""
+    teams_file = CONFIG_DIR / "teams.json"
+    if not teams_file.exists():
+        return {}
+
+    try:
+        data = json.loads(teams_file.read_text())
+        return {team["id"]: team for team in data}
+    except (json.JSONDecodeError, KeyError, OSError) as e:
+        print(f"Failed to load custom teams: {e}")
+        return {}
+
+
+def get_all_team_configs() -> dict[str, dict]:
+    """Get all team configs (built-in + custom), with custom configs loaded fresh."""
+    custom = load_custom_teams()
+    return {**BUILTIN_TEAM_CONFIGS, **custom}
+
+
+# Combined team configs
+TEAM_CONFIGS = get_all_team_configs()
+
+
 def create_team(
     team_id: str,
     tools: list[Callable],
@@ -232,17 +305,20 @@ def create_team(
     """Create a team instance with the given configuration.
 
     Args:
-        team_id: The team ID (research, etc.)
+        team_id: The team ID (research, or custom)
         tools: List of tool functions (run_python_code, etc.)
         tool_docs: Generated documentation for nested Python tools
 
     Returns:
         Configured Team instance
     """
-    if team_id not in TEAM_CONFIGS:
-        raise ValueError(f"Unknown team: {team_id}. Available: {list(TEAM_CONFIGS.keys())}")
+    # Use fresh configs to pick up custom teams
+    all_configs = get_all_team_configs()
 
-    config = TEAM_CONFIGS[team_id]
+    if team_id not in all_configs:
+        raise ValueError(f"Unknown team: {team_id}. Available: {list(all_configs.keys())}")
+
+    config = all_configs[team_id]
 
     # Build member agents with role-specific instructions
     ROLE_INSTRUCTIONS = {
@@ -347,9 +423,17 @@ WORKFLOWS: dict[str, Workflow] = {
 
 def get_teams_list() -> list[dict]:
     """Return list of available teams for the frontend."""
+    # Use fresh configs to pick up any changes
+    all_configs = get_all_team_configs()
     return [
-        {"id": team_id, "name": config["name"], "description": config["description"], "type": "team"}
-        for team_id, config in TEAM_CONFIGS.items()
+        {
+            "id": team_id,
+            "name": config["name"],
+            "description": config["description"],
+            "type": "team",
+            "builtin": team_id in BUILTIN_TEAM_CONFIGS,
+        }
+        for team_id, config in all_configs.items()
     ]
 
 

@@ -3,18 +3,19 @@
 This module provides multiple agents (general, coding, research) that can run
 Python code and install packages via uv. Tools registered in the ToolRegistry
 are available as functions within the interpreter.
+
+Uses AgentOS for unified agent management and AG-UI protocol support.
+Frontend: Use Agno's Agent UI (npx create-agent-ui@latest) connecting to port 7777.
 """
 
-import logging
-import subprocess
 import sys
-from io import StringIO
 from pathlib import Path
 
-from agno.tools import tool
+from agno.agent.agent import Agent
+from agno.os import AgentOS
+from agno.os.interfaces.agui import AGUI
+from agno.team import Team
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 # Ensure src directory is in path for uvicorn imports
@@ -24,81 +25,31 @@ if _src_dir not in sys.path:
 
 from agents import (
     AGENT_CONFIGS,
+    BUILTIN_AGENT_CONFIGS,
+    BUILTIN_TEAM_CONFIGS,
     TEAM_CONFIGS,
     TEAMS,
-    WORKFLOWS,
     create_agent,
     create_team,
-    get_agent_list,
-    get_teams_list,
-    get_workflows_list,
+    get_all_agent_configs,
+    get_all_team_configs,
+    load_custom_agents,
+    load_custom_teams,
 )
-from conversations import store as conversation_store
+from code_tools import AGENT_TOOLS, set_tool_registry
+from config_routes import router as config_router
+from logging_config import setup_logging
 from tools import BUILTIN_TOOLS, ToolRegistry, load_agno_toolkit, register_toolkit
 
 load_dotenv()
 
-# Paths
-LOG_DIR = Path(__file__).parent.parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-WORKSPACE_DIR = Path(__file__).parent.parent / "workspace"
-WORKSPACE_DIR.mkdir(exist_ok=True)
+# Configure logging
+setup_logging()
 
-# Configure loguru
-logger.remove()  # Remove default handler
+# ============================================================================
+# Tool Registry Setup
+# ============================================================================
 
-# Console: INFO and above with colors
-logger.add(
-    sys.stderr,
-    level="INFO",
-    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> - <level>{message}</level>",
-)
-
-# File: DEBUG and above, with rotation
-logger.add(
-    LOG_DIR / "agent.log",
-    level="DEBUG",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    rotation="10 MB",
-    retention="7 days",
-)
-
-
-# Intercept standard logging and route to loguru
-# This is necessary because third-party libraries (Agno, FastAPI, uvicorn) use
-# stdlib logging internally. The InterceptHandler captures their logs and routes
-# them through loguru so all logs have consistent formatting and go to the same sinks.
-class InterceptHandler(logging.Handler):
-    """Route stdlib logging to loguru for unified log handling."""
-
-    def emit(self, record: logging.LogRecord) -> None:
-        # Get corresponding Loguru level
-        try:
-            level = logger.level(record.levelname).name
-        except ValueError:
-            level = record.levelno
-
-        # Find caller from where originated the logged message
-        frame, depth = logging.currentframe(), 2
-        while frame and frame.f_code.co_filename == logging.__file__:
-            frame = frame.f_back
-            depth += 1
-
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
-
-# Route all stdlib logging to loguru (for third-party libs like Agno, FastAPI, uvicorn)
-logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-
-# Set Agno loggers to DEBUG so their messages flow to loguru
-logging.getLogger("agno.agent.agent").setLevel(logging.DEBUG)
-logging.getLogger("agno.team.team").setLevel(logging.DEBUG)
-
-# For our own code, use loguru directly:
-# from loguru import logger
-# logger.info("message")
-
-# Initialize the tool registry with built-in tools
 registry = ToolRegistry()
 for name, (func, description) in BUILTIN_TOOLS.items():
     registry.register(name, func, description)
@@ -115,7 +66,6 @@ if arxiv:
     print(f"Loaded arXiv tools: {registered}")
 
 # Load Google toolkits (requires GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_PROJECT_ID)
-# These will prompt for OAuth on first use
 gmail = load_agno_toolkit("gmail")
 if gmail:
     registered = register_toolkit(registry, gmail, prefix="gmail_")
@@ -126,142 +76,66 @@ if calendar:
     registered = register_toolkit(registry, calendar, prefix="cal_")
     print(f"Loaded Calendar tools: {registered}")
 
-
-@tool
-def uv_add(package: str) -> str:
-    """
-    Install a Python package using uv.
-
-    Args:
-        package: The package name to install (e.g., "yfinance", "pandas>=2.0")
-    """
-    # Use relative path from this file's location
-    backend_dir = Path(__file__).parent.parent
-    result = subprocess.run(
-        ["uv", "add", package],
-        capture_output=True,
-        text=True,
-        cwd=str(backend_dir),
-    )
-    if result.returncode == 0:
-        return f"Successfully installed {package}"
-    return f"Failed to install {package}: {result.stderr}"
-
-
-def _run_code_in_namespace(code: str, namespace: dict) -> None:
-    """Helper to run code - separated to avoid hook false positives."""
-    # Using compile + built-in execution for code interpreter
-    compiled = compile(code, "<string>", "exec")  # noqa: S102
-    builtins = __builtins__ if isinstance(__builtins__, dict) else vars(__builtins__)
-    builtins["exec"](compiled, namespace)
-
-
-@tool
-def run_python_code(code: str) -> str:
-    """
-    Run Python code with access to many built-in tools.
-
-    Available tools (call directly, no imports needed):
-
-    **Web & HTTP:**
-    - web_search(query, num_results=5) - Search the web via DuckDuckGo
-    - fetch_url(url, extract_text=True) - Fetch URL content
-    - http_get(url, headers=None) - HTTP GET request
-    - http_post(url, data=None, json_data=None, headers=None) - HTTP POST
-
-    **System:**
-    - shell(command, cwd=None, timeout=30) - Run shell commands
-    - read_file(path) - Read file from workspace
-    - write_file(path, content) - Write file to workspace
-    - list_files(pattern="*") - List workspace files
-
-    **Hacker News (if loaded):**
-    - hn_get_top_stories(num_stories=10) - Get top HN stories
-    - hn_get_new_stories(num_stories=10) - Get newest stories
-    - hn_get_user_details(username) - Get user info
-
-    **arXiv (if loaded):**
-    - arxiv_search(query, max_results=5) - Search academic papers
-
-    **Gmail (if configured):**
-    - gmail_get_latest_emails(count) - Get recent emails
-    - gmail_send_email(to, subject, body) - Send email
-    - gmail_search_emails(query, count) - Search emails
-
-    **Calendar (if configured):**
-    - cal_list_events(limit=10) - List upcoming events
-    - cal_create_event(...) - Create calendar event
-
-    Args:
-        code: The Python code to run.
-    """
-    # Build namespace with builtins + registered tools
-    tool_namespace = registry.get_namespace()
-    run_globals = {
-        "__builtins__": __builtins__,
-        **tool_namespace,
-    }
-
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    redirected_output = StringIO()
-    redirected_error = StringIO()
-    sys.stdout = redirected_output
-    sys.stderr = redirected_error
-
-    try:
-        _run_code_in_namespace(code, run_globals)
-        output = redirected_output.getvalue()
-        error = redirected_error.getvalue()
-        if error:
-            return f"Output:\n{output}\n\nErrors:\n{error}"
-        return output if output else "Code ran successfully (no output)"
-    except Exception as e:
-        return f"Error running code: {e}"
-    finally:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-
-
-@tool
-def save_and_run_python_file(file_name: str, code: str) -> str:
-    """
-    Save Python code to a file in the workspace and run it.
-
-    Note: Files run this way do NOT have access to built-in tools.
-    Use run_python_code for code that needs web_search, fetch_url, etc.
-
-    Args:
-        file_name: Name of the file to save (e.g., "script.py")
-        code: The Python code to save and run.
-    """
-    if not file_name.endswith(".py"):
-        file_name += ".py"
-
-    file_path = WORKSPACE_DIR / file_name
-    file_path.write_text(code)
-
-    result = subprocess.run(
-        ["python", str(file_path)],
-        capture_output=True,
-        text=True,
-        cwd=str(WORKSPACE_DIR),
-    )
-
-    output = result.stdout
-    error = result.stderr
-    if result.returncode != 0:
-        return f"Error running {file_name}:\n{error}"
-    if error:
-        return f"Output:\n{output}\n\nWarnings:\n{error}"
-    return output if output else f"{file_name} ran successfully (no output)"
-
+# Connect registry to code tools
+set_tool_registry(registry)
 
 # Generate dynamic tool documentation for agent instructions
 tool_docs = registry.generate_instructions()
 
-# Shared tools for all agents
-AGENT_TOOLS = [uv_add, run_python_code, save_and_run_python_file]
+# ============================================================================
+# Dynamic Agent/Team Cache
+# ============================================================================
+
+# Cache for dynamically created agents and teams
+_dynamic_agents: dict[str, Agent] = {}
+_dynamic_teams: dict[str, Team] = {}
+
+
+def get_or_create_agent(agent_id: str) -> Agent:
+    """Get an agent by ID, creating it dynamically if needed.
+
+    This enables hot-loading of custom agents without server restart.
+    Built-in agents are created once and cached.
+    Custom agents are created on first request and cached.
+    """
+    # Check cache first
+    if agent_id in _dynamic_agents:
+        return _dynamic_agents[agent_id]
+
+    # Create the agent (works for both built-in and custom)
+    agent = create_agent(
+        agent_id=agent_id,
+        tools=AGENT_TOOLS,
+        tool_docs=tool_docs,
+        debug_mode=True,
+    )
+    _dynamic_agents[agent_id] = agent
+    return agent
+
+
+def get_or_create_team(team_id: str) -> Team:
+    """Get a team by ID, creating it dynamically if needed."""
+    if team_id in _dynamic_teams:
+        return _dynamic_teams[team_id]
+
+    team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
+    _dynamic_teams[team_id] = team
+    return team
+
+
+def is_custom_agent(agent_id: str) -> bool:
+    """Check if an agent ID refers to a custom (non-built-in) agent."""
+    return agent_id not in BUILTIN_AGENT_CONFIGS
+
+
+def is_custom_team(team_id: str) -> bool:
+    """Check if a team ID refers to a custom (non-built-in) team."""
+    return team_id not in BUILTIN_TEAM_CONFIGS
+
+
+# ============================================================================
+# Agent and Team Creation (for AgentOS initialization)
+# ============================================================================
 
 
 def get_agent(agent_id: str):
@@ -274,185 +148,48 @@ def get_agent(agent_id: str):
     )
 
 
-# Create FastAPI app
-app = FastAPI(title="Agent Composer", description="Multi-agent AI assistant")
-
-# Add CORS middleware - restricted to localhost for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/agents")
-async def list_agents():
-    """List available agents for the frontend dropdown.
-
-    Frontend calls /api/agents, Vite proxy strips /api, so backend sees /agents.
-    """
-    return get_agent_list()
-
-
-@app.get("/teams")
-async def list_teams():
-    """List available teams for the frontend."""
-    return get_teams_list()
-
-
-@app.get("/workflows")
-async def list_workflows():
-    """List available workflows for the frontend."""
-    return get_workflows_list()
-
-
-# ============================================================================
-# Conversation API endpoints
-# ============================================================================
-
-from pydantic import BaseModel, field_validator
-
-
-class CreateConversationRequest(BaseModel):
-    """Request body for creating a conversation."""
-
-    agent_id: str = "general"
-    title: str | None = None
-
-    @field_validator("agent_id")
-    @classmethod
-    def validate_agent_id(cls, v: str) -> str:
-        if v not in AGENT_CONFIGS:
-            valid_agents = list(AGENT_CONFIGS.keys())
-            raise ValueError(f"Invalid agent_id '{v}'. Must be one of: {valid_agents}")
-        return v
-
-
-class AddMessageRequest(BaseModel):
-    """Request body for adding a message to a conversation."""
-
-    role: str
-    content: str
-    tool_calls: list[dict] = []
-    message_id: str | None = None
-
-
-class UpdateTitleRequest(BaseModel):
-    """Request body for updating conversation title."""
-
-    title: str
-
-
-@app.get("/conversations")
-async def list_conversations():
-    """List all conversations (summaries only, no messages)."""
-    conversations = conversation_store.list_all()
-    return [conv.to_summary() for conv in conversations]
-
-
-@app.post("/conversations")
-async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
-    conversation = conversation_store.create(
-        agent_id=request.agent_id,
-        title=request.title,
-    )
-    return conversation.to_dict()
-
-
-@app.get("/conversations/{conv_id}")
-async def get_conversation(conv_id: str):
-    """Get a conversation with all its messages."""
-    conversation = conversation_store.get(conv_id)
-    if not conversation:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return conversation.to_dict()
-
-
-@app.delete("/conversations/{conv_id}")
-async def delete_conversation(conv_id: str):
-    """Delete a conversation."""
-    deleted = conversation_store.delete(conv_id)
-    if not deleted:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {"status": "deleted"}
-
-
-@app.post("/conversations/{conv_id}/messages")
-async def add_message(conv_id: str, request: AddMessageRequest):
-    """Add a message to a conversation."""
-    message = conversation_store.add_message(
-        conv_id=conv_id,
-        role=request.role,
-        content=request.content,
-        tool_calls=request.tool_calls,
-        message_id=request.message_id,
-    )
-    if not message:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {
-        "id": message.id,
-        "role": message.role,
-        "content": message.content,
-        "tool_calls": message.tool_calls,
-        "timestamp": message.timestamp,
-    }
-
-
-@app.patch("/conversations/{conv_id}/title")
-async def update_conversation_title(conv_id: str, request: UpdateTitleRequest):
-    """Update a conversation's title."""
-    updated = conversation_store.update_title(conv_id, request.title)
-    if not updated:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    return {"status": "updated", "title": request.title}
-
-
-# ============================================================================
-# Import AGUI for streaming
-from agno.os.interfaces.agui import AGUI
-
-# Create AGUI routers for each agent and mount them at different paths
-# This allows agent selection via URL path: /{agent_id}/agui
+# Create agent instances for built-in agents only (custom loaded dynamically)
+agents = []
 for agent_id in AGENT_CONFIGS:
     agent = get_agent(agent_id)
-    agui = AGUI(agent=agent)
-    router = agui.get_router()
-    # Mount at /{agent_id} - the router itself has /agui endpoint
-    app.include_router(router, prefix=f"/{agent_id}", tags=[agent_id])
+    agents.append(agent)
+    _dynamic_agents[agent_id] = agent  # Cache using config ID
 
-# Also mount a default endpoint for backwards compatibility
-default_agent = get_agent("general")
-default_agui = AGUI(agent=default_agent)
-app.include_router(default_agui.get_router(), tags=["default"])
-
-# Mount AGUI routers for Teams - create with tools like agents
+# Create team instances
+teams = []
 for team_id in TEAM_CONFIGS:
     team = create_team(team_id, tools=AGENT_TOOLS, tool_docs=tool_docs)
-    TEAMS[team_id] = team  # Store for reference
-    team_agui = AGUI(team=team)
-    app.include_router(team_agui.get_router(), prefix=f"/team-{team_id}", tags=[f"team-{team_id}"])
+    TEAMS[team_id] = team
+    _dynamic_teams[team_id] = team
+    teams.append(team)
 
-# Note: Workflows don't have AGUI support yet - they need a custom endpoint
-# TODO: Add workflow execution endpoint using workflow.arun() or workflow.run()
+# Create AGUI interfaces for all agents and teams
+interfaces = []
+for agent in agents:
+    interfaces.append(AGUI(agent=agent))
+for team in teams:
+    interfaces.append(AGUI(team=team))
+
+# ============================================================================
+# AgentOS Application
+# ============================================================================
+
+agent_os = AgentOS(
+    agents=agents,
+    teams=teams,
+    interfaces=interfaces,
+)
+
+# Get the FastAPI app from AgentOS
+app = agent_os.get_app()
+
+# Add config routes for managing agents and teams
+app.include_router(config_router)
+
+logger.info(f"AgentOS initialized with {len(agents)} agents and {len(teams)} teams")
+logger.info("Agent UI: npx create-agent-ui@latest (connects to localhost:7777)")
 
 
 if __name__ == "__main__":
-    # Test with general agent
-    agent = get_agent("general")
-    agent.print_response("Search the web for 'Python best practices 2024' and summarize the top 3 results.")
+    # Serve with AgentOS on port 7777 (Agent UI default)
+    agent_os.serve(app="main:app", port=7777, reload=True)
