@@ -1,36 +1,38 @@
 # Agent Composer
 
-A local-first platform for designing, composing, and interacting with multi-agent AI systems.
+A local-first platform for designing, composing, and interacting with multi-agent AI systems using the Agno framework.
 
 ## Features
 
-- **Agent Studio**: AI-assisted agent creation with an in-browser code editor
-- **Built-in Domain Agents**: Pre-configured agents for research, data analysis, writing, and coding
-- **Team Builder**: Visual configuration for multi-agent workflows (sequential, parallel, router)
+- **Built-in Agents**: Pre-configured General Assistant and Coding Assistant
+- **Custom Agents**: Create your own agents via the API with custom models and instructions
+- **Team Collaboration**: Multi-agent teams with role-based member configurations
+- **Python Interpreter**: Agents can run Python code with access to web search, HTTP, shell, and file operations
 - **MCP Integration**: Connect to Model Context Protocol servers for extensible tool capabilities
-- **Conversation UI**: Real-time streaming agent interactions via AG-UI
+- **Session Persistence**: SQLite-backed conversation history with automatic session management
+- **AG-UI Protocol**: Real-time streaming agent interactions via AgentOS
 
 ## Tech Stack
 
 ### Backend
-- Python 3.11+
-- Agno framework
+- Python 3.12+
+- [Agno](https://docs.agno.com) framework with AgentOS
 - FastAPI
-- SQLite
+- SQLite (auto-managed by Agno)
+- OpenRouter for LLM access
 
 ### Frontend
+- [Agno Agent UI](https://github.com/agno-ai/agent-ui) (Next.js)
 - React 18+ with TypeScript
 - Bun package manager
 - TailwindCSS
-- Monaco Editor
-- CopilotKit (AG-UI)
 
 ## Quick Start
 
 ### Prerequisites
 - [uv](https://docs.astral.sh/uv/) - Python package manager
 - [Bun](https://bun.sh/) - JavaScript runtime
-- At least one LLM API key (OpenAI, Anthropic) or Ollama running locally
+- OpenRouter API key (get one at [openrouter.ai](https://openrouter.ai))
 
 ### Setup
 
@@ -40,107 +42,153 @@ git clone <repository-url>
 cd agent-composer
 ```
 
-2. Copy environment template and configure your API keys:
+2. Configure your OpenRouter API key:
 ```bash
-cp .env.example .env
-# Edit .env and add your API keys
+# Create .env file in the root directory
+echo "OPENROUTER_API_KEY=your-key-here" > .env
 ```
 
-3. Run the setup script:
+3. Install dependencies:
 ```bash
-./init.sh
+make install
 ```
 
-This will:
-- Install backend Python dependencies
-- Install frontend Node dependencies
-- Start both development servers
-
-### Manual Setup
-
-If you prefer manual setup:
-
-**Backend:**
+4. Start both servers:
 ```bash
-cd backend
-uv sync --dev
-uv run uvicorn src.main:app --reload --port 8000
+make dev
 ```
 
-**Frontend:**
-```bash
-cd frontend
-bun install
-bun run dev
-```
+This starts:
+- **Backend**: http://localhost:7777 (AgentOS API)
+- **Frontend**: http://localhost:3000 (Agent UI)
 
-## Development
-
-### Project Structure
+## Architecture
 
 ```
 agent-composer/
 ├── backend/
+│   ├── config/                 # Configuration files
+│   │   ├── agents.json         # Custom agent definitions
+│   │   ├── teams.json          # Custom team definitions
+│   │   └── mcp_servers.json    # MCP server configurations
+│   ├── data/                   # SQLite database (auto-created)
 │   ├── src/
-│   │   ├── api/          # REST API endpoints
-│   │   ├── agents/       # Agent definitions and registry
-│   │   ├── agui/         # AG-UI protocol adapter
-│   │   ├── database/     # SQLite models and migrations
-│   │   ├── mcp/          # MCP client integration
-│   │   └── runtime/      # Agent execution runtime
+│   │   ├── main.py             # AgentOS application entry point
+│   │   ├── agents.py           # Agent/Team configurations and factory
+│   │   ├── config_routes.py    # Config API for managing agents/teams
+│   │   ├── code_tools.py       # Python interpreter tools
+│   │   ├── logging_config.py   # Structured logging setup
+│   │   └── tools/              # Built-in and Agno toolkit integrations
+│   ├── tests/                  # Backend tests
 │   └── pyproject.toml
-├── frontend/
+├── frontend/                   # Agno Agent UI (Next.js)
 │   ├── src/
-│   │   ├── components/   # React components
-│   │   ├── pages/        # Route pages
-│   │   ├── stores/       # Zustand state stores
-│   │   ├── hooks/        # Custom React hooks
-│   │   └── lib/          # Utilities and API client
 │   └── package.json
-├── Makefile              # Build and development commands
-├── init.sh               # User-friendly setup wrapper
-├── feature_list.json     # Feature test cases
+├── Makefile                    # Build and development commands
 └── README.md
 ```
 
-### Available Commands
-
-You can use either `make` directly or the `./init.sh` wrapper:
+## Available Commands
 
 ```bash
-# Using init.sh (user-friendly wrapper)
-./init.sh              # Setup and start both servers
-./init.sh setup        # Install dependencies only
-./init.sh backend      # Start backend only
-./init.sh frontend     # Start frontend only
-./init.sh test         # Run tests
-./init.sh lint         # Lint code
-./init.sh clean        # Remove generated files
+# Install dependencies
+make install              # Install both backend and frontend
+make install-backend      # Install backend only
+make install-frontend     # Install frontend only
 
-# Using make directly
-make help              # Show all available commands
-make install           # Install all dependencies
-make dev               # Start both servers
-make dev-backend       # Start backend only
-make dev-frontend      # Start frontend only
-make test              # Run all tests
-make lint              # Lint all code
-make build             # Build for production
-make clean             # Remove generated files
+# Development
+make dev                  # Start both servers
+make dev-backend          # Start backend only (port 7777)
+make dev-frontend         # Start frontend only (port 3000)
+
+# Testing
+make test                 # Run backend tests
+make test-e2e             # Run end-to-end tests (requires both servers)
+
+# Code quality
+make lint                 # Lint both backend and frontend
+make lint-fix             # Fix linting issues
+
+# Cleanup
+make clean                # Remove generated files
+
+# Local LLM (optional)
+make model                # Start llama-server with default model
+make model MODEL=<hf-path> # Start specific model
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OPENAI_API_KEY` | OpenAI API key | - |
-| `ANTHROPIC_API_KEY` | Anthropic API key | - |
-| `OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` |
-| `DEFAULT_OPENAI_MODEL` | Default OpenAI model | `gpt-4o` |
-| `DEFAULT_ANTHROPIC_MODEL` | Default Anthropic model | `claude-3-5-sonnet-20241022` |
-| `DEFAULT_OLLAMA_MODEL` | Default Ollama model | `llama3.2` |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENROUTER_API_KEY` | OpenRouter API key for LLM access | Yes |
+
+### Custom Agents
+
+Create custom agents by adding entries to `backend/config/agents.json`:
+
+```json
+[
+  {
+    "id": "my-agent-abc123",
+    "name": "My Custom Agent",
+    "description": "Does specific things",
+    "model_id": "mistralai/devstral-2512:free",
+    "instructions": "You are a specialized assistant..."
+  }
+]
+```
+
+Or use the API:
+```bash
+curl -X POST http://localhost:7777/config/agents \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Agent", "model_id": "mistralai/devstral-2512:free", "instructions": "..."}'
+```
+
+### MCP Servers
+
+Configure MCP servers in `backend/config/mcp_servers.json`:
+
+```json
+{
+  "servers": [
+    {
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "enabled": true
+    }
+  ]
+}
+```
+
+## API Endpoints
+
+### Agents
+- `GET /agents` - List all agents
+- `GET /agents/{id}` - Get agent details
+- `POST /agents/{id}/runs` - Run agent (streaming)
+- `GET /config/all-agents` - List all agents with builtin flag
+- `POST /config/agents` - Create custom agent
+- `PUT /config/agents/{id}` - Update custom agent
+- `DELETE /config/agents/{id}` - Delete custom agent
+
+### Teams
+- `GET /teams` - List all teams
+- `POST /teams/{id}/runs` - Run team (streaming)
+- `GET /config/all-teams` - List all teams with builtin flag
+- `POST /config/teams` - Create custom team
+
+### Sessions
+- `GET /agents/{id}/sessions` - List agent sessions
+- `GET /agents/{id}/sessions/{session_id}` - Get session messages
+
+### Utilities
+- `GET /health` - Health check
+- `GET /config/models` - List available models
 
 ## License
 
