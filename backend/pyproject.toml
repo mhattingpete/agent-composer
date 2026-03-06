@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "agent-composer"
 version = "0.1.0"
 description = "A local-first platform for designing, composing, and interacting with multi-agent AI systems"
+keywords = ["agno", "multi-agent", "ai", "fastapi", "ag-ui"]
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

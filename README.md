@@ -1,5 +1,9 @@
 # Agent Composer
 
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/github/license/mhattingpete/agent-composer)](LICENSE)
+
 A local-first platform for designing, composing, and interacting with multi-agent AI systems using the Agno framework.
 
 ## Features
